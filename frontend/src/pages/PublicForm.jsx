@@ -129,7 +129,8 @@ export default function PublicForm() {
             }
 
             // Post to Google Sheets webhook backend
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
             await fetch(`${apiUrl}/api/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

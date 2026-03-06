@@ -34,7 +34,7 @@ export const generateForm = async (req, res) => {
 Do not return anything else except the JSON block. Do not use Markdown backticks. Provide raw JSON only.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: `${systemPrompt}\n\nPrompt: ${prompt}`,
             config: {
                 responseMimeType: "application/json",
@@ -66,7 +66,7 @@ export const generateNextQuestion = async (req, res) => {
 Do not return anything else except the JSON block.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: `${systemPrompt}\n\nAnswers: ${JSON.stringify(answers)}`,
             config: {
                 responseMimeType: "application/json",

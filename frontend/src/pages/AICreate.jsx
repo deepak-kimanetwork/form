@@ -16,7 +16,8 @@ export default function AICreate() {
         setError('');
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
             const response = await fetch(`${apiUrl}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
