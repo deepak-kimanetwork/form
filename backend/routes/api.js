@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateForm, generateNextQuestion } from '../ai.js';
+import { generateForm, generateNextQuestion, generateResponseSummary } from '../ai.js';
 import { submitToSheets } from '../sheets.js';
 import { supabase } from '../db.js';
 
@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post('/generate', generateForm);
 router.post('/generate-next', generateNextQuestion);
+router.post('/summary', generateResponseSummary);
 router.post('/submit', submitToSheets);
 
 // Save form to Supabase

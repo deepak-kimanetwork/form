@@ -65,3 +65,8 @@ export const getResponsesLocal = () => {
     const saved = localStorage.getItem('responses');
     return saved ? JSON.parse(saved) : [];
 };
+
+export const getResponsesByFormId = (formId) => {
+    const responses = getResponsesLocal();
+    return responses.filter(r => r.formId === formId);
+};
