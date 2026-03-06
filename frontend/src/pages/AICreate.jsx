@@ -25,7 +25,9 @@ export default function AICreate() {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to generate form. Ensure backend is running and Gemini key is set.');
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.error || 'Failed to generate form. Ensure backend is running and Gemini key is set.';
+                throw new Error(errorMessage);
             }
 
             const generatedSchema = await response.json();

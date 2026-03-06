@@ -2,10 +2,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the API with our key
 const getAiClient = () => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not configured in .env');
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY') {
+    console.error('AI Error: GEMINI_API_KEY is missing or not configured in backend/.env');
+    throw new Error('GEMINI_API_KEY is missing. Please check backend/.env file.');
   }
-  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  return new GoogleGenerativeAI(apiKey);
 };
 
 // Robust JSON extraction from AI response
@@ -39,7 +41,7 @@ export const generateForm = async (req, res) => {
     }
 
     const ai = getAiClient();
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const systemPrompt = `You are an expert form creator. Given a prompt by the user, you must return a strict JSON object that represents a form schema.
 Structure:
@@ -82,7 +84,7 @@ export const generateNextQuestion = async (req, res) => {
   try {
     const { question, answer, formTitle } = req.body;
     const ai = getAiClient();
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const systemPrompt = `Given form "${formTitle || 'General Form'}" and current answer "${answer}" to "${question}", generate ONE follow-up question as JSON:
 {
