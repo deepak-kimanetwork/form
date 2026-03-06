@@ -1,6 +1,6 @@
-export const saveForm = (form) => {
+export const saveForm = async (form) => {
+    // Save locally first
     const forms = getForms();
-    // If editing an existing form
     const existingIndex = forms.findIndex((f) => f.id === form.id);
     if (existingIndex >= 0) {
         forms[existingIndex] = form;
@@ -8,6 +8,19 @@ export const saveForm = (form) => {
         forms.push(form);
     }
     localStorage.setItem('forms', JSON.stringify(forms));
+
+    // Sync to cloud
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+        await fetch(`${apiUrl}/api/forms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form)
+        });
+    } catch (err) {
+        console.error('Failed to sync form to cloud:', err);
+    }
 };
 
 export const getForms = () => {
@@ -15,9 +28,24 @@ export const getForms = () => {
     return saved ? JSON.parse(saved) : [];
 };
 
-export const getFormById = (id) => {
+export const getFormById = async (id) => {
+    // Try local first
     const forms = getForms();
-    return forms.find((f) => f.id === id) || null;
+    const localForm = forms.find((f) => f.id === id);
+    if (localForm) return localForm;
+
+    // Try cloud
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+        const res = await fetch(`${apiUrl}/api/forms/${id}`);
+        if (res.ok) {
+            return await res.json();
+        }
+    } catch (err) {
+        console.error('Failed to fetch form from cloud:', err);
+    }
+    return null;
 };
 
 export const deleteForm = (id) => {

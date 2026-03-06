@@ -16,14 +16,16 @@ export default function PublicForm() {
     const [isDone, setIsDone] = useState(false);
 
     useEffect(() => {
-        const f = getFormById(formId);
-        if (f) {
-            setForm(f);
-        } else {
-            // Not found
-            alert('Form not found');
-            navigate('/');
-        }
+        const fetchForm = async () => {
+            const f = await getFormById(formId);
+            if (f) {
+                setForm(f);
+            } else {
+                alert('Form not found');
+                navigate('/');
+            }
+        };
+        fetchForm();
     }, [formId, navigate]);
 
     useEffect(() => {

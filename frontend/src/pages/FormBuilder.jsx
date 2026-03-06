@@ -4,7 +4,7 @@ import { getFormById, saveForm } from '../utils/storage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowLeft, GripVertical, Plus, Trash2, Save, Play, GitMerge, Settings } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, Trash2, Save, Play, GitMerge, Settings, Download } from 'lucide-react';
 
 const questionTypes = ['text', 'email', 'number', 'select', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
 
@@ -228,13 +228,18 @@ export default function FormBuilder() {
         }));
     };
 
-    const addQuestion = () => {
-        const newQ = { id: `q_${Date.now()}`, label: '', type: 'text' };
-        setForm(f => ({ ...f, questions: [...f.questions, newQ] }));
+    const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(form, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `${form.title.replace(/\s+/g, '_')}_backup.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
     };
 
-    const handleSave = () => {
-        saveForm(form);
+    const handleSave = async () => {
+        await saveForm(form);
         alert('Form saved successfully!');
         navigate('/admin');
     };
@@ -258,6 +263,9 @@ export default function FormBuilder() {
                     <div className="flex gap-3 relative">
                         <button onClick={() => setShowThemeSettings(!showThemeSettings)} className="p-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 font-medium">
                             <Settings className="w-5 h-5" />
+                        </button>
+                        <button onClick={handleExport} title="Download JSON Backup" className="p-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 font-medium">
+                            <Download className="w-5 h-5" />
                         </button>
                         <button onClick={() => navigate(`/forms/${form.id}`)} className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 font-medium">
                             <Play className="w-4 h-4" /> Preview
