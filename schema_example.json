@@ -1,0 +1,31 @@
+{
+  "title": "Restaurant Customer Feedback",
+  "questions": [
+    {
+      "id": "q1",
+      "label": "What is your full name?",
+      "type": "text"
+    },
+    {
+      "id": "q2",
+      "label": "Email address for future discounts",
+      "type": "email"
+    },
+    {
+      "id": "q3",
+      "label": "How many times have you visited us?",
+      "type": "number"
+    },
+    {
+      "id": "q4",
+      "label": "How would you rate the food quality?",
+      "type": "select",
+      "options": ["Excellent", "Good", "Average", "Poor"]
+    },
+    {
+      "id": "q5",
+      "label": "Any additional feedback for our chef?",
+      "type": "textarea"
+    }
+  ]
+}
