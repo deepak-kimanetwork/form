@@ -3,7 +3,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { Users, CheckCircle, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { Users, CheckCircle, Clock, TrendingUp, AlertCircle, Download } from 'lucide-react';
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -43,6 +43,40 @@ export default function AnalyticsView({ formId, responses = [] }) {
         ];
     }, []);
 
+    const exportToCSV = () => {
+        if (!responses.length) return;
+
+        // Get all unique question labels
+        const headersSet = new Set(['Timestamp']);
+        responses.forEach(r => Object.keys(r.answers).forEach(k => headersSet.add(k)));
+        const headers = Array.from(headersSet);
+
+        // Build CSV rows
+        const rows = responses.map(r => {
+            const rowData = headers.map(header => {
+                if (header === 'Timestamp') return new Date(r.created_at || r.timestamp).toLocaleString();
+                let val = r.answers[header] || '';
+                // Escape quotes and wrap in quotes if there's a comma
+                val = String(val).replace(/"/g, '""');
+                if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                    val = `"${val}"`;
+                }
+                return val;
+            });
+            return rowData.join(',');
+        });
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `responses_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (!responses.length) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -55,6 +89,16 @@ export default function AnalyticsView({ formId, responses = [] }) {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Header Actions */}
+            <div className="flex justify-end mb-4">
+                <button
+                    onClick={exportToCSV}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-bold text-sm transition-colors shadow-sm"
+                >
+                    <Download className="w-4 h-4" /> Export CSV
+                </button>
+            </div>
+
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatCard title="Total Responses" value={stats.total} icon={<Users />} color="blue" />

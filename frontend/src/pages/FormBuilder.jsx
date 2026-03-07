@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getFormById, saveForm, getResponsesByFormId } from '../utils/storage';
+import { getFormById, saveForm, getResponses } from '../utils/storage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -209,7 +209,11 @@ export default function FormBuilder() {
 
     useEffect(() => {
         if (form.id) {
-            setResponses(getResponsesByFormId(form.id));
+            const fetchResponses = async () => {
+                const res = await getResponses(form.id);
+                setResponses(res || []);
+            };
+            fetchResponses();
         }
     }, [form.id, activeTab]);
 

@@ -137,3 +137,24 @@ export const getResponsesByFormId = (formId) => {
     const responses = getResponsesLocal();
     return responses.filter(r => r.formId === formId);
 };
+
+export const getResponses = async (formId) => {
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return [];
+
+        const res = await fetch(`${apiUrl}/api/forms/${formId}/responses`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+
+        if (res.ok) {
+            return await res.json();
+        }
+    } catch (err) {
+        console.error('Failed to fetch responses:', err);
+    }
+    return [];
+};

@@ -9,7 +9,31 @@ const router = express.Router();
 router.post('/generate', generateForm);
 router.post('/generate-next', generateNextQuestion);
 router.post('/summary', generateResponseSummary);
-router.post('/submit', submitToSheets);
+router.post('/submit', async (req, res) => {
+    try {
+        const { formId, answers, webhookUrl } = req.body;
+
+        if (supabase) {
+            const { error } = await supabase
+                .from('responses')
+                .insert([{ form_id: formId, answers }]);
+
+            if (error) {
+                console.error("Error saving response to Supabase:", error);
+            }
+        }
+
+        // If webhook logic applies, let it handle the response
+        if (webhookUrl) {
+            return await submitToSheets(req, res);
+        }
+
+        return res.json({ success: true, message: 'Response saved locally.' });
+    } catch (err) {
+        console.error('Submit route error:', err);
+        return res.status(500).json({ error: 'Failed to process submission' });
+    }
+});
 
 // Get user's forms
 router.get('/forms', requireAuth, async (req, res) => {
@@ -34,6 +58,38 @@ router.get('/forms', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error fetching user forms:', error);
         res.status(500).json({ error: 'Failed to fetch forms' });
+    }
+});
+
+// Get responses for a specific form
+router.get('/forms/:id/responses', requireAuth, async (req, res) => {
+    try {
+        if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+        // Verify ownership
+        const { data: form, error: formError } = await supabase
+            .from('forms')
+            .select('id')
+            .eq('id', req.params.id)
+            .eq('user_id', req.user.id)
+            .single();
+
+        if (formError || !form) {
+            return res.status(403).json({ error: 'Unauthorized or form not found' });
+        }
+
+        const { data: responses, error } = await supabase
+            .from('responses')
+            .select('*')
+            .eq('form_id', req.params.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json(responses);
+    } catch (err) {
+        console.error('Error fetching responses:', err);
+        res.status(500).json({ error: 'Failed to fetch form responses' });
     }
 });
 
