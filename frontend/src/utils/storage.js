@@ -158,3 +158,24 @@ export const getResponses = async (formId) => {
     }
     return [];
 };
+
+export const getAllResponses = async () => {
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return [];
+
+        const res = await fetch(`${apiUrl}/api/responses`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+
+        if (res.ok) {
+            return await res.json();
+        }
+    } catch (err) {
+        console.error('Failed to fetch all responses:', err);
+    }
+    return [];
+};

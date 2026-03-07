@@ -61,6 +61,38 @@ router.get('/forms', requireAuth, async (req, res) => {
     }
 });
 
+// Get all responses for all forms owned by the user
+router.get('/responses', requireAuth, async (req, res) => {
+    try {
+        if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+        // First find forms owned by user
+        const { data: forms, error: formsError } = await supabase
+            .from('forms')
+            .select('id')
+            .eq('user_id', req.user.id);
+
+        if (formsError) throw formsError;
+        if (!forms || forms.length === 0) return res.json([]);
+
+        const formIds = forms.map(f => f.id);
+
+        // Then fetch responses for those forms
+        const { data: responses, error } = await supabase
+            .from('responses')
+            .select('*')
+            .in('form_id', formIds)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json(responses);
+    } catch (err) {
+        console.error('Error fetching all user responses:', err);
+        res.status(500).json({ error: 'Failed to fetch all responses' });
+    }
+});
+
 // Get responses for a specific form
 router.get('/forms/:id/responses', requireAuth, async (req, res) => {
     try {

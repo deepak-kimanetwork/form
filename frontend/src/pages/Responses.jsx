@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getResponsesLocal, getForms } from '../utils/storage';
+import { getAllResponses, getForms } from '../utils/storage';
 
 export default function Responses() {
     const [responses, setResponses] = useState([]);
     const [forms, setForms] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
-        setResponses(getResponsesLocal().reverse());
-        setForms(getForms());
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const [resps, loadedForms] = await Promise.all([
+                    getAllResponses(),
+                    getForms()
+                ]);
+                setResponses(resps || []);
+                setForms(loadedForms || []);
+            } catch (err) {
+                console.error("Failed to load responses:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
     }, []);
 
     const getFormTitle = (formId) => {
@@ -28,7 +43,11 @@ export default function Responses() {
                     <h1 className="text-3xl font-bold text-gray-900">Form Responses</h1>
                 </div>
 
-                {responses.length === 0 ? (
+                {isLoading ? (
+                    <div className="bg-white p-12 rounded-xl border border-gray-200 text-center flex justify-center items-center">
+                        <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                    </div>
+                ) : responses.length === 0 ? (
                     <div className="bg-white p-12 rounded-xl border border-gray-200 text-center">
                         <p className="text-gray-500">No responses collected yet.</p>
                     </div>
