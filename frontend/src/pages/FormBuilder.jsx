@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { getFormById, saveForm } from '../utils/storage';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { getFormById, saveForm, getResponsesByFormId } from '../utils/storage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
     ArrowLeft, GripVertical, Plus, Trash2, Save, Play,
     GitMerge, Settings, Download, Layout, BarChart3,
-    Image as ImageIcon, Type, Palette, Smartphone, Laptop
+    Image as ImageIcon, Type, Palette, Smartphone, Laptop,
+    Share2, Copy, Loader2
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
-import { getResponsesByFormId } from '../utils/storage';
 
 const questionTypes = ['text', 'email', 'number', 'select', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
 
@@ -170,7 +170,9 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
 export default function FormBuilder() {
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState('editor'); // editor, workflow, analytics
+    const [isSaving, setIsSaving] = useState(false);
     const [form, setForm] = useState({
         id: `form_${Date.now()}`,
         title: 'Untitled Form',
@@ -186,7 +188,12 @@ export default function FormBuilder() {
         sections: [{ id: 'sec_1', title: 'Main Section' }],
         questions: []
     });
+    const [responses, setResponses] = useState([]);
     const [showThemeSettings, setShowThemeSettings] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareLevel, setShareLevel] = useState('none');
+    const [shareId, setShareId] = useState('');
+    const [devicePreview, setDevicePreview] = useState('desktop');
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -194,10 +201,35 @@ export default function FormBuilder() {
     );
 
     useEffect(() => {
-        if (location.state?.formId) {
+        if (form.id) {
+            setResponses(getResponsesByFormId(form.id));
+        }
+    }, [form.id, activeTab]);
+
+    useEffect(() => {
+        const shareToken = searchParams.get('share');
+
+        if (shareToken) {
+            const fetchShared = async () => {
+                const existing = await getFormById(shareToken, true);
+                if (existing) {
+                    setForm(existing);
+                    setShareId(existing.edit_token);
+                    setShareLevel(existing.sharing_level);
+                } else {
+                    alert('Invalid or expired share link');
+                    navigate('/');
+                }
+            };
+            fetchShared();
+        } else if (location.state?.formId) {
             const fetchExisting = async () => {
                 const existing = await getFormById(location.state.formId);
-                if (existing) setForm(existing);
+                if (existing) {
+                    setForm(existing);
+                    setShareId(existing.sharing_id || '');
+                    setShareLevel(existing.sharing_level || 'none');
+                }
             };
             fetchExisting();
         } else if (location.state?.generatedSchema) {
@@ -269,9 +301,37 @@ export default function FormBuilder() {
     };
 
     const handleSave = async () => {
-        await saveForm(form);
-        alert('Form saved successfully!');
-        navigate('/admin');
+        setIsSaving(true);
+        try {
+            // Include sharing info if changed
+            const updatedForm = { ...form };
+            if (shareId) updatedForm.sharing_id = shareId;
+            updatedForm.sharing_level = shareLevel;
+
+            await saveForm(updatedForm, form.edit_token);
+            alert('Form saved successfully!');
+            if (!searchParams.get('share')) {
+                navigate('/admin');
+            }
+        } catch (error) {
+            alert(error.message || 'Failed to save form');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const generateShareLink = async () => {
+        const newShareId = shareId || `share_${Math.random().toString(36).substr(2, 9)}`;
+        setShareId(newShareId);
+
+        try {
+            await saveForm({ ...form, sharing_id: newShareId, sharing_level: shareLevel }, form.edit_token);
+            const link = `${window.location.origin}/admin/builder?share=${newShareId}`;
+            await navigator.clipboard.writeText(link);
+            alert('Share link copied to clipboard!');
+        } catch (error) {
+            alert('Failed to generate share link');
+        }
     };
 
     return (
@@ -383,15 +443,60 @@ export default function FormBuilder() {
                                 </div>
                             )}
                         </button>
+
+                        <div className="relative">
+                            <button onClick={() => setShowShareModal(!showShareModal)} className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 font-bold transition-all">
+                                <Share2 className="w-4 h-4" /> Share
+                            </button>
+                            {showShareModal && (
+                                <div className="absolute right-0 top-12 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl p-6 z-50 text-left" onClick={e => e.stopPropagation()}>
+                                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Share2 className="w-5 h-5 text-primary-600" /> Share Form Access</h3>
+                                    <p className="text-xs text-gray-500 mb-6">Allow others to view analytics or edit this form builder.</p>
+
+                                    <div className="space-y-4 mb-6">
+                                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                                            <input type="radio" checked={shareLevel === 'none'} onChange={() => setShareLevel('none')} className="text-primary-600" />
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-900">Private</p>
+                                                <p className="text-xs text-gray-500">Only you can access</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                                            <input type="radio" checked={shareLevel === 'view'} onChange={() => setShareLevel('view')} className="text-primary-600" />
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-900">Viewer</p>
+                                                <p className="text-xs text-gray-500">Can view analytics and form structure</p>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                                            <input type="radio" checked={shareLevel === 'edit'} onChange={() => setShareLevel('edit')} className="text-primary-600" />
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-900">Editor</p>
+                                                <p className="text-xs text-gray-500">Can edit form and view analytics</p>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    {shareLevel !== 'none' && (
+                                        <button onClick={generateShareLink} className="w-full py-2 bg-gray-900 text-white rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors">
+                                            <Copy className="w-4 h-4" /> Copy Share Link
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         <button onClick={handleExport} title="Download JSON Backup" className="p-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50">
                             <Download className="w-5 h-5" />
                         </button>
-                        <button onClick={() => navigate(`/forms/${form.id}`)} className="px-5 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 font-bold transition-all">
+                        <button onClick={() => navigate(`/forms/${form.id}`)} className="px-5 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center gap-2 font-bold transition-all">
                             <Play className="w-4 h-4" /> Preview
                         </button>
-                        <button onClick={handleSave} className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black flex items-center gap-2 font-bold shadow-lg shadow-gray-200 transition-all">
-                            <Save className="w-4 h-4" /> Save
-                        </button>
+                        {form.sharing_level !== 'view' && (
+                            <button onClick={handleSave} disabled={isSaving} className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold shadow-lg shadow-primary-500/20 transition-all">
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -454,17 +559,77 @@ export default function FormBuilder() {
                             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Live Preview</span>
                                 <div className="flex gap-2">
-                                    <Smartphone className="w-4 h-4 text-gray-400" />
-                                    <Laptop className="w-4 h-4 text-gray-900" />
+                                    <button
+                                        onClick={() => setDevicePreview('mobile')}
+                                        className={`p-1.5 rounded-md ${devicePreview === 'mobile' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >
+                                        <Smartphone className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setDevicePreview('desktop')}
+                                        className={`p-1.5 rounded-md ${devicePreview === 'desktop' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >
+                                        <Laptop className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto bg-gray-50 flex items-center justify-center p-6 text-center">
-                                <div className="space-y-4">
-                                    <div className="w-16 h-16 bg-white rounded-full mx-auto shadow-sm flex items-center justify-center">
-                                        {form.theme?.logoUrl ? <img src={form.theme.logoUrl} className="max-h-8 max-w-8" /> : <ImageIcon className="w-6 h-6 text-gray-200" />}
+                            <div className="flex-1 overflow-y-auto w-full flex justify-center bg-gray-100 py-6">
+                                <div
+                                    className={`bg-white shadow-xl overflow-y-auto transition-all duration-300 ${devicePreview === 'mobile' ? 'w-[320px] rounded-3xl border-[8px] border-gray-200 h-[568px]' : 'w-full max-w-2xl rounded-xl h-full'}`}
+                                    style={{ backgroundColor: form.theme?.backgroundColor || '#ffffff' }}
+                                >
+                                    <div className="p-6">
+                                        {form.theme?.logoUrl && (
+                                            <div className="w-full flex justify-center mb-6">
+                                                <img src={form.theme.logoUrl} className="max-h-12" alt="Brand Logo" />
+                                            </div>
+                                        )}
+                                        <h4 className="text-2xl font-bold mb-2" style={{ color: form.theme?.primaryColor || '#111827', fontFamily: form.theme?.fontFamily || 'Inter' }}>
+                                            {form.title}
+                                        </h4>
+
+                                        <div className="space-y-6 mt-6 w-full text-left">
+                                            {form.questions.map((q, idx) => (
+                                                <div key={q.id} className="w-full">
+                                                    <label className="block text-sm font-semibold mb-2" style={{ color: form.theme?.textColor || '#374151', fontFamily: form.theme?.fontFamily || 'Inter' }}>
+                                                        {idx + 1}. {q.label || 'Untitled Question'}
+                                                        {q.required && <span className="text-red-500 ml-1">*</span>}
+                                                    </label>
+
+                                                    {q.type === 'text' || q.type === 'email' || q.type === 'number' ? (
+                                                        <input disabled type={q.type} className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" placeholder="Your answer..." />
+                                                    ) : q.type === 'textarea' ? (
+                                                        <textarea disabled className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" rows="3" placeholder="Your answer..."></textarea>
+                                                    ) : q.type === 'select' || q.type === 'multiple-choice' ? (
+                                                        <div className="space-y-2">
+                                                            {q.options?.map((opt, i) => (
+                                                                <div key={i} className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-white opacity-70">
+                                                                    <input disabled type={q.type === 'select' ? 'radio' : 'checkbox'} className="w-4 h-4" />
+                                                                    <span className="text-sm">{opt}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : q.type === 'rating' ? (
+                                                        <div className="flex gap-2">
+                                                            {[1, 2, 3, 4, 5].map(star => (
+                                                                <div key={star} className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold opacity-70">{star}</div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500 italic opacity-70">
+                                                            Interactive preview for {q.type}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {form.questions.length > 0 && (
+                                            <button disabled className="mt-8 px-6 py-2.5 rounded-lg text-white font-bold w-full opacity-50" style={{ backgroundColor: form.theme?.primaryColor || '#22c55e', fontFamily: form.theme?.fontFamily || 'Inter' }}>
+                                                Submit
+                                            </button>
+                                        )}
                                     </div>
-                                    <h4 className="text-xl font-bold text-gray-900">Preview Mode</h4>
-                                    <p className="text-sm text-gray-500">Preview updates instantly as you build.</p>
                                 </div>
                             </div>
                         </div>

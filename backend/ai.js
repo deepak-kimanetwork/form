@@ -1,22 +1,63 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the API with our key
-const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY') {
-    console.error('AI Error: GEMINI_API_KEY is missing or not configured in backend/.env');
+let clients = null;
+let currentKeyIndex = 0;
+
+const getClients = () => {
+  if (clients) return clients;
+
+  const apiKeys = process.env.GEMINI_API_KEYS ? process.env.GEMINI_API_KEYS.split(',') : [process.env.GEMINI_API_KEY];
+  const validKeys = apiKeys.filter(key => key && key !== 'YOUR_GEMINI_API_KEY');
+
+  if (validKeys.length === 0) {
+    console.error('AI Error: GEMINI_API_KEY or GEMINI_API_KEYS is missing or not configured');
     throw new Error('GEMINI_API_KEY is missing. Please check backend/.env file.');
   }
-  return new GoogleGenerativeAI(apiKey);
+
+  clients = validKeys.map(key => new GoogleGenerativeAI(key.trim()));
+  return clients;
+};
+
+const rotateClient = () => {
+  const c = getClients();
+  currentKeyIndex = (currentKeyIndex + 1) % c.length;
+  return c[currentKeyIndex];
+};
+
+const callWithRetry = async (fn, maxRetries = 3) => {
+  let lastError;
+  const c = getClients();
+  const models = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+
+  for (let m = 0; m < models.length; m++) {
+    const currentModel = models[m];
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const client = c[currentKeyIndex];
+        return await fn(client, currentModel);
+      } catch (error) {
+        lastError = error;
+        if (error.message.includes('429') || error.message.includes('quota')) {
+          console.warn(`Quota exceeded for key ${currentKeyIndex} with model ${currentModel}. Rotating key...`);
+          rotateClient();
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          continue;
+        }
+        throw error;
+      }
+    }
+    console.warn(`All keys exhausted for model ${currentModel}. Falling back to next model...`);
+  }
+  throw lastError;
 };
 
 // Robust JSON extraction from AI response
 const extractJson = (text) => {
   try {
-    // If it's already a clean JSON string
     return JSON.parse(text);
   } catch (e) {
-    // Try to find JSON block
     const firstOpen = text.indexOf('{');
     const lastClose = text.lastIndexOf('}');
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
@@ -35,15 +76,11 @@ const extractJson = (text) => {
 export const generateForm = async (req, res) => {
   try {
     const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
-
-    const ai = getAiClient();
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-    const systemPrompt = `You are an expert form creator. Given a prompt by the user, you must return a strict JSON object that represents a form schema.
+    const schema = await callWithRetry(async (client, modelName) => {
+      const model = client.getGenerativeModel({ model: modelName });
+      const systemPrompt = `You are an expert form creator. Given a prompt by the user, you must return a strict JSON object that represents a form schema.
 Structure:
 {
   "title": "Form Title",
@@ -68,11 +105,11 @@ Structure:
 For multiple-choice logic, if the user selects ANY of the options in the rule, it should trigger.
 Do not use Markdown backticks. Provide raw JSON only. Ensure use of valid JSON.`;
 
-    const result = await model.generateContent(`${systemPrompt}\n\nPrompt: ${prompt}`);
-    const response = await result.response;
-    const text = response.text();
+      const result = await model.generateContent(`${systemPrompt}\n\nPrompt: ${prompt}`);
+      const response = await result.response;
+      return extractJson(response.text());
+    });
 
-    const schema = extractJson(text);
     return res.json(schema);
   } catch (error) {
     console.error('Error generating form:', error);
@@ -83,20 +120,20 @@ Do not use Markdown backticks. Provide raw JSON only. Ensure use of valid JSON.`
 export const generateNextQuestion = async (req, res) => {
   try {
     const { question, answer, formTitle } = req.body;
-    const ai = getAiClient();
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const systemPrompt = `Given form "${formTitle || 'General Form'}" and current answer "${answer}" to "${question}", generate ONE follow-up question as JSON:
+    const data = await callWithRetry(async (client, modelName) => {
+      const model = client.getGenerativeModel({ model: modelName });
+      const systemPrompt = `Given form "${formTitle || 'General Form'}" and current answer "${answer}" to "${question}", generate ONE follow-up question as JSON:
 {
   "followUp": "Question text"
 }
 If no follow-up is needed, return empty object {}.
 Raw JSON only.`;
 
-    const result = await model.generateContent(`${systemPrompt}`);
-    const response = await result.response;
-    const text = response.text();
-    const data = extractJson(text);
+      const result = await model.generateContent(`${systemPrompt}`);
+      const response = await result.response;
+      return extractJson(response.text());
+    });
 
     return res.json(data);
   } catch (error) {
@@ -110,10 +147,9 @@ export const generateResponseSummary = async (req, res) => {
     const { answers } = req.body;
     if (!answers) return res.status(400).json({ error: 'Answers required' });
 
-    const ai = getAiClient();
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const systemPrompt = `Summarize these form responses professionally. Identify high-value leads and provide a concise 3-4 line summary.
+    const summary = await callWithRetry(async (client, modelName) => {
+      const model = client.getGenerativeModel({ model: modelName });
+      const systemPrompt = `Summarize these form responses professionally. Identify high-value leads and provide a concise 3-4 line summary.
 Output format:
 {
   "summary": "Summary text here",
@@ -121,10 +157,10 @@ Output format:
 }
 Raw JSON only.`;
 
-    const result = await model.generateContent(`${systemPrompt}\n\nAnswers: ${JSON.stringify(answers)}`);
-    const response = await result.response;
-    const text = response.text();
-    const summary = extractJson(text);
+      const result = await model.generateContent(`${systemPrompt}\n\nAnswers: ${JSON.stringify(answers)}`);
+      const response = await result.response;
+      return extractJson(response.text());
+    });
 
     return res.json(summary);
   } catch (error) {

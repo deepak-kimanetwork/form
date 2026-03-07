@@ -1,22 +1,35 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AdminDashboard from './pages/AdminDashboard';
 import AICreate from './pages/AICreate';
 import FormBuilder from './pages/FormBuilder';
 import PublicForm from './pages/PublicForm';
 import Responses from './pages/Responses';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+const ProtectedRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+};
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<AdminDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/create" element={<AICreate />} />
-        <Route path="/admin/builder" element={<FormBuilder />} />
-        <Route path="/forms/:formId" element={<PublicForm />} />
-        <Route path="/responses" element={<Responses />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/create" element={<ProtectedRoute><AICreate /></ProtectedRoute>} />
+          <Route path="/admin/builder" element={<ProtectedRoute><FormBuilder /></ProtectedRoute>} />
+          <Route path="/responses" element={<ProtectedRoute><Responses /></ProtectedRoute>} />
+          <Route path="/forms/:formId" element={<PublicForm />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

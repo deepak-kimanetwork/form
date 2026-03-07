@@ -1,44 +1,73 @@
-export const saveForm = async (form) => {
-    // Save locally first
-    const forms = getForms();
-    const existingIndex = forms.findIndex((f) => f.id === form.id);
-    if (existingIndex >= 0) {
-        forms[existingIndex] = form;
-    } else {
-        forms.push(form);
-    }
-    localStorage.setItem('forms', JSON.stringify(forms));
+import { supabase } from './supabase';
 
-    // Sync to cloud
+export const saveForm = async (form, editToken = null) => {
     try {
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
-        await fetch(`${apiUrl}/api/forms`, {
+
+        const headers = { 'Content-Type': 'application/json' };
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const payload = { ...form };
+        if (editToken) {
+            payload.edit_token = editToken;
+        }
+
+        const res = await fetch(`${apiUrl}/api/forms`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(form)
+            headers,
+            body: JSON.stringify(payload)
         });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to save form');
+        }
     } catch (err) {
         console.error('Failed to sync form to cloud:', err);
+        throw err;
     }
 };
 
-export const getForms = () => {
-    const saved = localStorage.getItem('forms');
-    return saved ? JSON.parse(saved) : [];
-};
-
-export const getFormById = async (id) => {
-    // Try local first
-    const forms = getForms();
-    const localForm = forms.find((f) => f.id === id);
-    if (localForm) return localForm;
-
-    // Try cloud
+export const getForms = async () => {
     try {
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
-        const res = await fetch(`${apiUrl}/api/forms/${id}`);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return [];
+
+        const res = await fetch(`${apiUrl}/api/forms`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+
+        if (res.ok) {
+            return await res.json();
+        }
+    } catch (err) {
+        console.error('Failed to fetch forms:', err);
+    }
+    return [];
+};
+
+export const getFormById = async (id, isShared = false) => {
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+        const endpoint = isShared ? `/api/shared/${id}` : `/api/forms/${id}`;
+
+        const headers = {};
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const res = await fetch(`${apiUrl}${endpoint}`, { headers });
         if (res.ok) {
             return await res.json();
         }
@@ -48,10 +77,21 @@ export const getFormById = async (id) => {
     return null;
 };
 
-export const deleteForm = (id) => {
-    const forms = getForms();
-    const updated = forms.filter((f) => f.id !== id);
-    localStorage.setItem('forms', JSON.stringify(updated));
+export const deleteForm = async (id) => {
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        await fetch(`${apiUrl}/api/forms/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+    } catch (err) {
+        console.error('Failed to delete form:', err);
+    }
 };
 
 // For storing local dev responses to show in the Responses page
