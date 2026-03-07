@@ -50,11 +50,13 @@ export default function PublicForm() {
             document.body.style.backgroundColor = isDarkLocal ? '#111827' : (form.theme.backgroundColor || '#ffffff');
             document.body.style.color = isDarkLocal ? '#f9fafb' : (form.theme.textColor || '#111827');
             document.body.style.fontFamily = form.theme.fontFamily || 'Inter, sans-serif';
+            document.title = form.title || 'Form';
         }
         return () => {
             document.body.style.backgroundColor = '';
             document.body.style.color = '';
             document.body.style.fontFamily = '';
+            document.title = 'AI Form Builder';
         }
     }, [form]);
 

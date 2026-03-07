@@ -65,6 +65,10 @@ router.post('/forms', optionalAuth, async (req, res) => {
             user_id: existing ? existing.user_id : req.user.id
         };
 
+        if (req.body.custom_url !== undefined) {
+            upsertData.custom_url = req.body.custom_url || null; // null if empty
+        }
+
         // Only owner can change sharing settings
         if (isCreating || isOwner) {
             if (sharing_id !== undefined) upsertData.sharing_id = sharing_id;
@@ -139,6 +143,30 @@ router.delete('/forms/:id', requireAuth, async (req, res) => {
     }
 });
 
+// Check URL availability
+router.post('/forms/check-url', requireAuth, async (req, res) => {
+    try {
+        const { custom_url, form_id } = req.body;
+        if (!custom_url) return res.json({ available: true });
+
+        const { data, error } = await supabase
+            .from('forms')
+            .select('id')
+            .eq('custom_url', custom_url)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+
+        // Available if no data found OR if the conflicting form is exactly the current form
+        const isAvailable = !data || data.id === form_id;
+
+        res.json({ available: isAvailable });
+    } catch (error) {
+        console.error('Error checking URL:', error);
+        res.status(500).json({ error: 'Failed to check URL' });
+    }
+});
+
 // Get form from Supabase (Public - for filling out)
 router.get('/forms/:id', async (req, res) => {
     try {
@@ -148,7 +176,7 @@ router.get('/forms/:id', async (req, res) => {
         const { data, error } = await supabase
             .from('forms')
             .select('*')
-            .eq('id', id)
+            .or(`id.eq."${id}",custom_url.eq."${id}"`)
             .single();
 
         if (error) {
@@ -160,6 +188,7 @@ router.get('/forms/:id', async (req, res) => {
         const form = {
             id: data.id,
             title: data.title,
+            custom_url: data.custom_url,
             ...data.schema
         };
 

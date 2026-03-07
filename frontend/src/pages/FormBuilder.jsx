@@ -8,11 +8,12 @@ import {
     ArrowLeft, GripVertical, Plus, Trash2, Save, Play,
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
-    Share2, Copy, Loader2, Link as LinkIcon
+    Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
 import { supabase } from '../utils/supabase';
+import { checkCustomUrl } from '../utils/storage';
 
 const questionTypes = ['text', 'email', 'number', 'select', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
 
@@ -177,6 +178,7 @@ export default function FormBuilder() {
     const [form, setForm] = useState({
         id: `form_${Date.now()}`,
         title: 'Untitled Form',
+        custom_url: '',
         theme: {
             primaryColor: '#22c55e',
             backgroundColor: '#ffffff',
@@ -196,6 +198,8 @@ export default function FormBuilder() {
     const [shareId, setShareId] = useState('');
     const [devicePreview, setDevicePreview] = useState('desktop');
     const [isUploading, setIsUploading] = useState(false);
+    const [urlAvailable, setUrlAvailable] = useState(null);
+    const [checkingUrl, setCheckingUrl] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -362,6 +366,12 @@ export default function FormBuilder() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            if (form.custom_url && urlAvailable === false) {
+                alert('The custom URL is already taken. Please choose another one.');
+                setIsSaving(false);
+                return;
+            }
+
             // Include sharing info if changed
             const updatedForm = { ...form };
             if (shareId) updatedForm.sharing_id = shareId;
@@ -436,10 +446,47 @@ export default function FormBuilder() {
                             <Settings className="w-5 h-5" />
                             {showThemeSettings && (
                                 <div className="absolute right-0 top-12 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl p-6 z-50 text-left" onClick={e => e.stopPropagation()}>
-                                    <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2 text-lg"><Palette className="w-5 h-5 text-primary-600" /> Branding & Theme</h3>
+                                    <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2 text-lg"><Palette className="w-5 h-5 text-primary-600" /> Settings & Theme</h3>
 
                                     <div className="space-y-6">
                                         <div>
+                                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center gap-2">
+                                                <LinkIcon className="w-3 h-3" /> Custom Public Link
+                                            </label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center border-r border-gray-200 pr-2 pointer-events-none">
+                                                    <span className="text-gray-500 sm:text-sm">/forms/</span>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={form.custom_url || ''}
+                                                    onChange={async (e) => {
+                                                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                                                        setForm(f => ({ ...f, custom_url: val }));
+                                                        if (val.length > 2) {
+                                                            setCheckingUrl(true);
+                                                            const available = await checkCustomUrl(val, form.id);
+                                                            setUrlAvailable(available);
+                                                            setCheckingUrl(false);
+                                                        } else if (val.length === 0) {
+                                                            setUrlAvailable(null);
+                                                            setCheckingUrl(false);
+                                                        }
+                                                    }}
+                                                    placeholder="my-cool-form"
+                                                    className={`w-full pl-20 pr-10 py-2 border rounded-lg text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary-100 transition-colors ${form.custom_url ? (urlAvailable ? 'border-green-300' : (urlAvailable === false ? 'border-red-300' : 'border-gray-200')) : 'border-gray-200'}`}
+                                                />
+                                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                    {checkingUrl ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> :
+                                                        form.custom_url?.length > 2 ? (
+                                                            urlAvailable ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />
+                                                        ) : null}
+                                                </div>
+                                            </div>
+                                            {urlAvailable === false && <p className="text-xs text-red-500 mt-1">This URL is already taken.</p>}
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-100">
                                             <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center justify-between">
                                                 <span className="flex items-center gap-2"><ImageIcon className="w-3 h-3" /> Brand Logo</span>
                                                 {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary-500" />}
@@ -562,7 +609,8 @@ export default function FormBuilder() {
                         </button>
                         <button
                             onClick={() => {
-                                const link = `${window.location.origin}/forms/${form.id}`;
+                                const target = form.custom_url ? form.custom_url : form.id;
+                                const link = `${window.location.origin}/forms/${target}`;
                                 navigator.clipboard.writeText(link);
                                 alert('Public form link copied!');
                             }}
@@ -570,7 +618,7 @@ export default function FormBuilder() {
                         >
                             <LinkIcon className="w-4 h-4" /> Copy Link
                         </button>
-                        <button onClick={() => navigate(`/forms/${form.id}`)} className="px-5 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center gap-2 font-bold transition-all">
+                        <button onClick={() => navigate(`/forms/${form.custom_url || form.id}`)} className="px-5 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center gap-2 font-bold transition-all">
                             <Play className="w-4 h-4" /> Preview
                         </button>
                         {form.sharing_level !== 'view' && (

@@ -91,12 +91,12 @@ export default function AdminDashboard() {
 
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                 <div className="flex gap-2">
-                                    <button onClick={() => navigate(`/forms/${form.id}`)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-xs font-bold transition-colors bg-primary-50 hover:bg-primary-100 px-2.5 py-1.5 rounded-lg">
+                                    <button onClick={() => navigate(`/forms/${form.custom_url || form.id}`)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-xs font-bold transition-colors bg-primary-50 hover:bg-primary-100 px-2.5 py-1.5 rounded-lg">
                                         <FileText className="w-3.5 h-3.5" /> Open
                                     </button>
                                     <button
                                         onClick={() => {
-                                            const link = `${window.location.origin}/forms/${form.id}`;
+                                            const link = `${window.location.origin}/forms/${form.custom_url || form.id}`;
                                             navigator.clipboard.writeText(link);
                                             alert('Form link copied!');
                                         }}

@@ -1,5 +1,32 @@
 import { supabase } from './supabase';
 
+export const checkCustomUrl = async (customUrl, currentFormId) => {
+    try {
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return true; // Auth required to save anyway
+
+        const res = await fetch(`${apiUrl}/api/forms/check-url`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ custom_url: customUrl, form_id: currentFormId })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            return data.available;
+        }
+    } catch (err) {
+        console.error('Failed to check custom URL:', err);
+    }
+    return true; // Default to allowing it, server will catch if actually duplicate
+};
+
 export const saveForm = async (form, editToken = null) => {
     try {
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
