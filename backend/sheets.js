@@ -10,15 +10,22 @@ export const submitToSheets = async (req, res) => {
         const response = await fetch(webhookUrl, {
             method: 'POST',
             body: JSON.stringify({ formId, answers }),
-            headers: { 'Content-Type': 'application/json' },
-            mode: 'no-cors' // Google Apps Script web apps often require no-cors for direct POSTs
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        const result = await response.json();
+        // Google Apps Script can sometimes return an HTML error page if improperly configured
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error('Webhook did not return JSON. Raw response:', text.substring(0, 200));
+            throw new Error('Invalid response from webhook');
+        }
 
         return res.json(result);
     } catch (error) {
         console.error('Error submitting to Google Sheets:', error);
-        res.status(500).json({ error: 'Failed to submit form responses' });
+        res.status(500).json({ error: 'Failed to submit form responses via webhook' });
     }
 };
