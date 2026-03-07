@@ -1,17 +1,17 @@
 export const submitToSheets = async (req, res) => {
     try {
-        const { formId, answers } = req.body;
+        const { formId, answers, webhookUrl } = req.body;
 
-        if (!process.env.GOOGLE_SHEETS_WEBHOOK_URL) {
-            console.warn('Webhook URL not configured, skipping sheets integration');
-            // We can return a success anyway with a warning so development doesn't block
-            return res.json({ success: true, simulated: true, warning: 'GOOGLE_SHEETS_WEBHOOK_URL not set' });
+        if (!webhookUrl) {
+            console.warn('Webhook URL not provided by form, skipping sheets integration');
+            return res.json({ success: true, simulated: true, warning: 'webhookUrl not provided' });
         }
 
-        const response = await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
+        const response = await fetch(webhookUrl, {
             method: 'POST',
             body: JSON.stringify({ formId, answers }),
             headers: { 'Content-Type': 'application/json' },
+            mode: 'no-cors' // Google Apps Script web apps often require no-cors for direct POSTs
         });
 
         const result = await response.json();

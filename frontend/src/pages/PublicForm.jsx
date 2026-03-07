@@ -197,7 +197,11 @@ export default function PublicForm() {
             await fetch(`${apiUrl}/api/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ formId: form.id, answers })
+                body: JSON.stringify({
+                    formId: form.id,
+                    answers,
+                    webhookUrl: form.theme?.googleSheetWebhookUrl
+                })
             });
 
             const summaryRes = await fetch(`${apiUrl}/api/summary`, {

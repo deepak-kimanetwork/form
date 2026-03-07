@@ -8,7 +8,8 @@ import {
     ArrowLeft, GripVertical, Plus, Trash2, Save, Play,
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
-    Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle
+    Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle,
+    Database
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
@@ -484,6 +485,26 @@ export default function FormBuilder() {
                                                 </div>
                                             </div>
                                             {urlAvailable === false && <p className="text-xs text-red-500 mt-1">This URL is already taken.</p>}
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Database className="w-4 h-4 text-green-600" />
+                                                <h4 className="font-bold text-gray-900 text-sm">Google Sheets Integration</h4>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mb-3">
+                                                Paste a Google Apps Script Webhook URL to send responses directly to your sheet.
+                                            </p>
+                                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest flex items-center gap-2">
+                                                <LinkIcon className="w-3 h-3" /> Webhook URL
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.theme?.googleSheetWebhookUrl || ''}
+                                                onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, googleSheetWebhookUrl: e.target.value } }))}
+                                                placeholder="https://script.google.com/macros/s/.../exec"
+                                                className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary-100 transition-colors"
+                                            />
                                         </div>
 
                                         <div className="pt-4 border-t border-gray-100">
