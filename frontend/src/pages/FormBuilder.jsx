@@ -8,10 +8,11 @@ import {
     ArrowLeft, GripVertical, Plus, Trash2, Save, Play,
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
-    Share2, Copy, Loader2
+    Share2, Copy, Loader2, Link as LinkIcon
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
+import { supabase } from '../utils/supabase';
 
 const questionTypes = ['text', 'email', 'number', 'select', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
 
@@ -194,6 +195,7 @@ export default function FormBuilder() {
     const [shareLevel, setShareLevel] = useState('none');
     const [shareId, setShareId] = useState('');
     const [devicePreview, setDevicePreview] = useState('desktop');
+    const [isUploading, setIsUploading] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -213,7 +215,20 @@ export default function FormBuilder() {
             const fetchShared = async () => {
                 const existing = await getFormById(shareToken, true);
                 if (existing) {
-                    setForm(existing);
+                    const normalizedSections = (existing.sections && existing.sections.length > 0)
+                        ? existing.sections
+                        : [{ id: 'sec_1', title: 'Main Section' }];
+
+                    setForm({
+                        ...existing,
+                        sections: normalizedSections,
+                        questions: (existing.questions || []).map(q => ({
+                            ...q,
+                            sectionId: normalizedSections.some(s => s.id === q.sectionId)
+                                ? q.sectionId
+                                : normalizedSections[0].id
+                        }))
+                    });
                     setShareId(existing.edit_token);
                     setShareLevel(existing.sharing_level);
                 } else {
@@ -226,7 +241,20 @@ export default function FormBuilder() {
             const fetchExisting = async () => {
                 const existing = await getFormById(location.state.formId);
                 if (existing) {
-                    setForm(existing);
+                    const normalizedSections = (existing.sections && existing.sections.length > 0)
+                        ? existing.sections
+                        : [{ id: 'sec_1', title: 'Main Section' }];
+
+                    setForm({
+                        ...existing,
+                        sections: normalizedSections,
+                        questions: (existing.questions || []).map(q => ({
+                            ...q,
+                            sectionId: normalizedSections.some(s => s.id === q.sectionId)
+                                ? q.sectionId
+                                : normalizedSections[0].id
+                        }))
+                    });
                     setShareId(existing.sharing_id || '');
                     setShareLevel(existing.sharing_level || 'none');
                 }
@@ -234,14 +262,15 @@ export default function FormBuilder() {
             fetchExisting();
         } else if (location.state?.generatedSchema) {
             const schema = location.state.generatedSchema;
+            const normalizedSections = schema.sections || [{ id: 'sec_1', title: 'Main Section' }];
             setForm({
                 id: `form_${Date.now()}`,
                 title: schema.title || 'Generated Form',
                 theme: { ...form.theme, ...schema.theme },
-                sections: schema.sections || [{ id: 'sec_1', title: 'Main Section' }],
+                sections: normalizedSections,
                 questions: schema.questions.map(q => ({
                     id: q.id || `q_${Math.random().toString(36).substr(2, 9)}`,
-                    sectionId: q.sectionId || 'sec_1',
+                    sectionId: q.sectionId || normalizedSections[0].id,
                     label: q.label || '',
                     type: q.type || 'text',
                     required: q.required || false,
@@ -298,6 +327,36 @@ export default function FormBuilder() {
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
+    };
+
+    const handleImageUpload = async (e, field) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `${form.id}/${fileName}`;
+
+            // Upload to Supabase Storage 'logos' bucket
+            const { error: uploadError } = await supabase.storage
+                .from('logos')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                throw uploadError;
+            }
+
+            // Get public URL
+            const { data } = supabase.storage.from('logos').getPublicUrl(filePath);
+
+            setForm(f => ({ ...f, theme: { ...f.theme, [field]: data.publicUrl } }));
+        } catch (error) {
+            alert('Error uploading image: ' + error.message);
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const handleSave = async () => {
@@ -381,29 +440,41 @@ export default function FormBuilder() {
 
                                     <div className="space-y-6">
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center gap-2">
-                                                <ImageIcon className="w-3 h-3" /> Brand Logo URL
+                                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center justify-between">
+                                                <span className="flex items-center gap-2"><ImageIcon className="w-3 h-3" /> Brand Logo</span>
+                                                {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary-500" />}
                                             </label>
                                             <input
-                                                type="text"
-                                                value={form.theme?.logoUrl || ''}
-                                                onChange={e => setForm(f => ({ ...f, theme: { ...f.theme, logoUrl: e.target.value } }))}
-                                                className="w-full border border-gray-200 rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white outline-none transition-all focus:ring-2 focus:ring-primary-100"
-                                                placeholder="https://yourbrand.com/logo.png"
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleImageUpload(e, 'logoUrl')}
+                                                className="w-full border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 focus:bg-white outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                                             />
+                                            {form.theme?.logoUrl && (
+                                                <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Image uploaded
+                                                    <button onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, logoUrl: '' } }))} className="text-red-500 hover:underline ml-auto">Remove</button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center gap-2">
-                                                <ImageIcon className="w-3 h-3" /> Background Image URL
+                                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest flex items-center justify-between">
+                                                <span className="flex items-center gap-2"><ImageIcon className="w-3 h-3" /> Background Image</span>
+                                                {isUploading && <Loader2 className="w-3 h-3 animate-spin text-primary-500" />}
                                             </label>
                                             <input
-                                                type="text"
-                                                value={form.theme?.backgroundImageUrl || ''}
-                                                onChange={e => setForm(f => ({ ...f, theme: { ...f.theme, backgroundImageUrl: e.target.value } }))}
-                                                className="w-full border border-gray-200 rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white outline-none transition-all focus:ring-2 focus:ring-primary-100"
-                                                placeholder="https://images.unsplash.com/..."
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleImageUpload(e, 'backgroundImageUrl')}
+                                                className="w-full border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 focus:bg-white outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                                             />
+                                            {form.theme?.backgroundImageUrl && (
+                                                <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Image uploaded
+                                                    <button onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, backgroundImageUrl: '' } }))} className="text-red-500 hover:underline ml-auto">Remove</button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
@@ -489,6 +560,16 @@ export default function FormBuilder() {
                         <button onClick={handleExport} title="Download JSON Backup" className="p-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50">
                             <Download className="w-5 h-5" />
                         </button>
+                        <button
+                            onClick={() => {
+                                const link = `${window.location.origin}/forms/${form.id}`;
+                                navigator.clipboard.writeText(link);
+                                alert('Public form link copied!');
+                            }}
+                            className="px-4 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 flex items-center gap-2 font-bold transition-all"
+                        >
+                            <LinkIcon className="w-4 h-4" /> Copy Link
+                        </button>
                         <button onClick={() => navigate(`/forms/${form.id}`)} className="px-5 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center gap-2 font-bold transition-all">
                             <Play className="w-4 h-4" /> Preview
                         </button>
@@ -506,7 +587,7 @@ export default function FormBuilder() {
                     <div className="flex gap-8 items-start">
                         {/* Questions List */}
                         <div className="flex-1 max-w-3xl mx-auto">
-                            {form.sections.map((section) => (
+                            {(form.sections || [{ id: 'sec_1', title: 'Main Section' }]).map((section) => (
                                 <div key={section.id} className="mb-12">
                                     <div className="flex items-center gap-4 mb-6 group">
                                         <Layout className="w-5 h-5 text-gray-400" />

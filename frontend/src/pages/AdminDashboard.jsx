@@ -90,9 +90,21 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                <button onClick={() => navigate(`/forms/${form.id}`)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-sm font-bold transition-colors bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg">
-                                    <LinkIcon className="w-4 h-4" /> Open
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => navigate(`/forms/${form.id}`)} className="text-primary-600 hover:text-primary-700 flex items-center gap-1.5 text-xs font-bold transition-colors bg-primary-50 hover:bg-primary-100 px-2.5 py-1.5 rounded-lg">
+                                        <FileText className="w-3.5 h-3.5" /> Open
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const link = `${window.location.origin}/forms/${form.id}`;
+                                            navigator.clipboard.writeText(link);
+                                            alert('Form link copied!');
+                                        }}
+                                        className="text-green-600 hover:text-green-700 flex items-center gap-1.5 text-xs font-bold transition-colors bg-green-50 hover:bg-green-100 px-2.5 py-1.5 rounded-lg"
+                                    >
+                                        <LinkIcon className="w-3.5 h-3.5" /> Copy Link
+                                    </button>
+                                </div>
                                 <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => navigate('/admin/builder', { state: { formId: form.id } })} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors border border-transparent hover:border-primary-100" title="Edit Form">
                                         <Edit className="w-4 h-4" />

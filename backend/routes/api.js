@@ -61,7 +61,7 @@ router.post('/forms', optionalAuth, async (req, res) => {
         const upsertData = {
             id,
             title,
-            schema: { questions, theme },
+            schema: { questions, theme, sections: req.body.sections },
             user_id: existing ? existing.user_id : req.user.id
         };
 
