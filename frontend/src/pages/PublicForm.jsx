@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFormById, saveResponseLocal } from '../utils/storage';
@@ -13,6 +13,7 @@ export default function PublicForm() {
     const [answers, setAnswers] = useState({});
     const [direction, setDirection] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const submittingRef = useRef(false);
     const [isDone, setIsDone] = useState(false);
     const [summary, setSummary] = useState(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -189,6 +190,8 @@ export default function PublicForm() {
     };
 
     const submitForm = async () => {
+        if (submittingRef.current) return;
+        submittingRef.current = true;
         setIsSubmitting(true);
         try {
             const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -219,8 +222,10 @@ export default function PublicForm() {
         } catch (err) {
             console.error(err);
             alert('Failed to submit form.');
+            submittingRef.current = false;
         } finally {
             setIsSubmitting(false);
+            // We do NOT reset submittingRef to false on success, because we want to stay blocked while showing the "Done" screen
         }
     };
 
