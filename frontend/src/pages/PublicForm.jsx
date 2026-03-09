@@ -262,7 +262,7 @@ export default function PublicForm() {
     return (
         <div className={`min-h-screen flex flex-col overflow-hidden transition-colors duration-500 relative ${isDark ? 'bg-gray-950 text-white' : ''}`} style={{ backgroundColor: !isDark ? theme.backgroundColor : undefined, color: !isDark ? theme.textColor : undefined, fontFamily: theme.fontFamily }}>
             {theme.backgroundImageUrl && (
-                <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
                     <img src={theme.backgroundImageUrl} className="w-full h-full object-cover" alt="" />
                 </div>
             )}

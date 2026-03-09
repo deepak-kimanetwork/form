@@ -729,9 +729,14 @@ export default function FormBuilder() {
                             </div>
                             <div className="flex-1 overflow-y-auto w-full flex justify-center bg-gray-100 py-6">
                                 <div
-                                    className={`bg-white shadow-xl overflow-y-auto transition-all duration-300 ${devicePreview === 'mobile' ? 'w-[320px] rounded-3xl border-[8px] border-gray-200 h-[568px]' : 'w-full max-w-2xl rounded-xl h-full'}`}
+                                    className={`bg-white shadow-xl overflow-y-auto transition-all duration-300 relative ${devicePreview === 'mobile' ? 'w-[320px] rounded-3xl border-[8px] border-gray-200 h-[568px]' : 'w-full max-w-2xl rounded-xl h-full'}`}
                                     style={{ backgroundColor: form.theme?.backgroundColor || '#ffffff' }}
                                 >
+                                    {form.theme?.backgroundImageUrl && (
+                                        <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
+                                            <img src={form.theme.backgroundImageUrl} className="w-full h-full object-cover" alt="" />
+                                        </div>
+                                    )}
                                     <div className="p-6">
                                         {form.theme?.logoUrl && (
                                             <div className="w-full flex justify-center mb-6">
