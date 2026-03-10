@@ -1489,5 +1489,3 @@ export default function FormBuilder() {
         </div>
     );
 }
-
-export default FormBuilder;
