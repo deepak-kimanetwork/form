@@ -78,6 +78,22 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                             />
                             <span className="text-sm font-medium text-gray-600">Required</span>
                         </label>
+
+                        {['select', 'multiple-choice'].includes(question.type) && (
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only"
+                                        checked={question.hasOther || false}
+                                        onChange={(e) => updateQuestion(id, 'hasOther', e.target.checked)}
+                                    />
+                                    <div className={`w-10 h-5 rounded-full transition-colors ${question.hasOther ? 'bg-orange-500' : 'bg-gray-300'}`} />
+                                    <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${question.hasOther ? 'translate-x-5' : ''}`} />
+                                </div>
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-700 transition-colors">Include "Other"</span>
+                            </label>
+                        )}
                     </div>
 
                     {(question.type === 'select' || question.type === 'multiple-choice') && (
@@ -179,9 +195,14 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                     </div>
                 </div>
 
-                <button onClick={() => removeQuestion(id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity mt-2">
-                    <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex flex-col gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => duplicateQuestion(id)} className="text-gray-400 hover:text-primary-600" title="Duplicate Question">
+                        <Copy className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => removeQuestion(id)} className="text-gray-400 hover:text-red-500" title="Remove Question">
+                        <Trash2 className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -333,7 +354,7 @@ export default function FormBuilder() {
         }));
     };
 
-    const addQuestion = (sectionId = 'sec_1') => {
+    const addQuestion = (sectionId = 'sec_1', atTop = false) => {
         const newQ = {
             id: `q_${Math.random().toString(36).substr(2, 9)}`,
             sectionId,
@@ -342,7 +363,43 @@ export default function FormBuilder() {
             required: false,
             logic: []
         };
-        setForm(f => ({ ...f, questions: [...f.questions, newQ] }));
+        setForm(f => ({
+            ...f,
+            questions: atTop ? [newQ, ...f.questions] : [...f.questions, newQ]
+        }));
+
+        if (!atTop) {
+            setTimeout(() => {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }, 100);
+        }
+    };
+
+    const duplicateQuestion = (id) => {
+        const qIndex = form.questions.findIndex(q => q.id === id);
+        if (qIndex === -1) return;
+
+        const original = form.questions[qIndex];
+        const clone = {
+            ...JSON.parse(JSON.stringify(original)),
+            id: `q_${Math.random().toString(36).substr(2, 9)}`,
+            label: `${original.label} (Copy)`
+        };
+
+        const newQuestions = [...form.questions];
+        newQuestions.splice(qIndex + 1, 0, clone);
+        setForm(f => ({ ...f, questions: newQuestions }));
+    };
+
+    const addSection = () => {
+        const newSec = {
+            id: `sec_${Date.now()}`,
+            title: 'New Section'
+        };
+        setForm(f => ({
+            ...f,
+            sections: [...f.sections, newSec]
+        }));
     };
 
     const handleExport = () => {
@@ -698,6 +755,22 @@ export default function FormBuilder() {
             </header>
 
             <main className="max-w-6xl mx-auto px-4 mt-8">
+                {activeTab === 'editor' && (
+                    <div className="flex gap-4 mb-6">
+                        <button
+                            onClick={() => addQuestion(form.sections[0]?.id, true)}
+                            className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all group"
+                        >
+                            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Question at Top
+                        </button>
+                        <button
+                            onClick={addSection}
+                            className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
+                        >
+                            <Layout className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Section
+                        </button>
+                    </div>
+                )}
                 {activeTab === 'editor' && (
                     <div className="flex gap-8 items-start">
                         {/* Questions List */}

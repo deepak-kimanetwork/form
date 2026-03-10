@@ -90,6 +90,21 @@ export default function PublicForm() {
             return;
         }
 
+        // Merge "Other" text if applicable
+        if (currentQ.hasOther) {
+            const otherVal = answers[`${currentQ.label}_other`];
+            if (otherVal) {
+                if (Array.isArray(currentAnswer)) {
+                    if (currentAnswer.includes('Other')) {
+                        const merged = currentAnswer.map(v => v === 'Other' ? otherVal : v);
+                        setAnswers(a => ({ ...a, [currentQ.label]: merged }));
+                    }
+                } else if (currentAnswer === 'Other') {
+                    setAnswers(a => ({ ...a, [currentQ.label]: otherVal }));
+                }
+            }
+        }
+
         processNextStep();
     };
 
@@ -336,48 +351,65 @@ export default function PublicForm() {
                                         />
                                     ) : (currentQ?.type === 'select' || currentQ?.type === 'multiple-choice') ? (
                                         <div className="space-y-3">
-                                            {currentQ.options?.map((opt, i) => {
+                                            {[...(currentQ.options || []), ...(currentQ.hasOther ? ['Other'] : [])].map((opt, i) => {
                                                 const isMulti = currentQ.allowMultiple === true;
                                                 const currentAnswers = answers[currentQ.label] || (isMulti ? [] : '');
                                                 const isSelected = isMulti ? currentAnswers.includes(opt) : currentAnswers === opt;
+                                                const isOther = opt === 'Other';
 
                                                 return (
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => {
-                                                            if (isMulti) {
-                                                                const arr = Array.isArray(currentAnswers) ? currentAnswers : [];
-                                                                if (arr.includes(opt)) {
-                                                                    setAnswers(a => ({ ...a, [currentQ.label]: arr.filter(x => x !== opt) }));
+                                                    <div key={i} className="space-y-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isMulti) {
+                                                                    const arr = Array.isArray(currentAnswers) ? currentAnswers : [];
+                                                                    if (arr.includes(opt)) {
+                                                                        setAnswers(a => ({ ...a, [currentQ.label]: arr.filter(x => x !== opt) }));
+                                                                    } else {
+                                                                        setAnswers(a => ({ ...a, [currentQ.label]: [...arr, opt] }));
+                                                                    }
                                                                 } else {
-                                                                    setAnswers(a => ({ ...a, [currentQ.label]: [...arr, opt] }));
+                                                                    setAnswers(a => ({ ...a, [currentQ.label]: opt }));
+                                                                    if (!isOther) {
+                                                                        setTimeout(handleNext, 300);
+                                                                    }
                                                                 }
-                                                            } else {
-                                                                setAnswers(a => ({ ...a, [currentQ.label]: opt }));
-                                                                setTimeout(handleNext, 300);
-                                                            }
-                                                        }}
-                                                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${isSelected ? '' : 'border-opacity-20 hover:border-opacity-50'} ${isDark ? 'bg-white/5' : ''}`}
-                                                        style={{
-                                                            borderColor: isSelected ? theme.primaryColor : undefined,
-                                                            backgroundColor: isSelected ? `${theme.primaryColor}20` : undefined,
-                                                            color: isSelected ? (isDark ? '#fff' : theme.primaryColor) : undefined
-                                                        }}
-                                                    >
-                                                        <span className="text-lg font-medium">{opt}</span>
-                                                        {isMulti ? (
-                                                            <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${isSelected ? '' : 'border-opacity-30'}`}
-                                                                style={{
-                                                                    borderColor: isSelected ? theme.primaryColor : undefined,
-                                                                    backgroundColor: isSelected ? theme.primaryColor : 'transparent',
-                                                                    color: isSelected ? '#fff' : 'transparent'
-                                                                }}>
-                                                                {isSelected && <Check className="w-4 h-4" />}
-                                                            </div>
-                                                        ) : (
-                                                            isSelected && <Check className="w-6 h-6" style={{ color: theme.primaryColor }} />
+                                                            }}
+                                                            className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${isSelected ? '' : 'border-opacity-20 hover:border-opacity-50'} ${isDark ? 'bg-white/5' : ''}`}
+                                                            style={{
+                                                                borderColor: isSelected ? theme.primaryColor : undefined,
+                                                                backgroundColor: isSelected ? `${theme.primaryColor}20` : undefined,
+                                                                color: isSelected ? (isDark ? '#fff' : theme.primaryColor) : undefined
+                                                            }}
+                                                        >
+                                                            <span className="text-lg font-medium">{opt}</span>
+                                                            {isMulti ? (
+                                                                <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${isSelected ? '' : 'border-opacity-30'}`}
+                                                                    style={{
+                                                                        borderColor: isSelected ? theme.primaryColor : undefined,
+                                                                        backgroundColor: isSelected ? theme.primaryColor : 'transparent',
+                                                                        color: isSelected ? '#fff' : 'transparent'
+                                                                    }}>
+                                                                    {isSelected && <Check className="w-4 h-4" />}
+                                                                </div>
+                                                            ) : (
+                                                                isSelected && <Check className="w-6 h-6" style={{ color: theme.primaryColor }} />
+                                                            )}
+                                                        </button>
+
+                                                        {isOther && isSelected && (
+                                                            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-2">
+                                                                <textarea
+                                                                    autoFocus
+                                                                    placeholder="Please specify..."
+                                                                    value={answers[`${currentQ.label}_other`] || ''}
+                                                                    onChange={(e) => setAnswers(a => ({ ...a, [`${currentQ.label}_other`]: e.target.value }))}
+                                                                    className={`w-full p-3 bg-transparent border-b-2 outline-none transition-colors border-opacity-20 ${isDark ? 'border-white' : 'border-black'}`}
+                                                                    style={{ borderColor: answers[`${currentQ.label}_other`] ? theme.primaryColor : undefined }}
+                                                                />
+                                                            </motion.div>
                                                         )}
-                                                    </button>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -448,7 +480,7 @@ export default function PublicForm() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'welcome-screen'].includes(currentQ?.type) && (
+                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'select', 'welcome-screen'].includes(currentQ?.type) && (
                                 <button
                                     onClick={handleNext}
                                     disabled={isSubmitting || isAiLoading}
