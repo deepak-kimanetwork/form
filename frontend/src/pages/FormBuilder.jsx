@@ -468,10 +468,15 @@ export default function FormBuilder() {
         try {
             const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
             const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+            const headers = (form.questions || []).map(q => q.label || q.title || 'Untitled Question');
             const res = await fetch(`${apiUrl}/api/create-sheet`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tokens: form.theme.googleTokens, title: form.title || 'Untitled Form' })
+                body: JSON.stringify({
+                    tokens: form.theme.googleTokens,
+                    title: form.title || 'Untitled Form',
+                    headers
+                })
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);

@@ -65,10 +65,10 @@ export default function Responses() {
                                 {responses.map((resp, i) => (
                                     <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                                         <td className="p-4 text-sm text-gray-600 whitespace-nowrap align-top">
-                                            {new Date(resp.timestamp).toLocaleString()}
+                                            {new Date(resp.created_at || resp.timestamp).toLocaleString()}
                                         </td>
                                         <td className="p-4 text-sm font-medium text-gray-900 align-top">
-                                            {getFormTitle(resp.formId)}
+                                            {getFormTitle(resp.form_id || resp.formId)}
                                         </td>
                                         <td className="p-4 align-top">
                                             <div className="space-y-2">

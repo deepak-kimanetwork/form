@@ -47,7 +47,7 @@ export const listSheets = async (tokens) => {
     return response.data.files;
 };
 
-export const createSheet = async (tokens, title) => {
+export const createSheet = async (tokens, title, headers = []) => {
     const auth = await getAuthenticatedClient(tokens);
     const sheets = google.sheets({ version: 'v4', auth });
 
@@ -58,6 +58,20 @@ export const createSheet = async (tokens, title) => {
         resource,
         fields: 'spreadsheetId,spreadsheetUrl'
     });
+
+    const spreadsheetId = spreadsheet.data.spreadsheetId;
+
+    // Initialize with headers if provided
+    if (headers && headers.length > 0) {
+        const fullHeaders = ['Timestamp', ...headers];
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'A1',
+            valueInputOption: 'RAW',
+            resource: { values: [fullHeaders] }
+        });
+    }
+
     return spreadsheet.data;
 };
 

@@ -10,14 +10,40 @@ export default function AdminDashboard() {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
 
-    const fetchForms = async () => {
-        const fetchedForms = await getForms();
-        setForms(fetchedForms);
+    const fetchData = async () => {
+        try {
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const [formsRes, statsRes] = await Promise.all([
+                fetch(`${apiUrl}/api/forms`, {
+                    headers: { 'Authorization': `Bearer ${session.access_token}` }
+                }),
+                fetch(`${apiUrl}/api/stats`, {
+                    headers: { 'Authorization': `Bearer ${session.access_token}` }
+                })
+            ]);
+
+            if (formsRes.ok) {
+                const fetchedForms = await formsRes.json();
+                setForms(fetchedForms);
+            }
+
+            if (statsRes.ok) {
+                const stats = await statsRes.json();
+                setResponsesCount(stats.totalResponses);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        }
     };
 
     useEffect(() => {
-        fetchForms();
-        setResponsesCount(getResponsesLocal().length);
+        fetchData();
+        // Set up an interval or just refresh when returning to page
     }, []);
 
     const handleDelete = async (id) => {

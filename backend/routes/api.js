@@ -60,8 +60,8 @@ router.get('/auth/google/callback', async (req, res) => {
 
 router.post('/create-sheet', async (req, res) => {
     try {
-        const { tokens, title } = req.body;
-        const sheet = await createSheet(tokens, title);
+        const { tokens, title, headers } = req.body;
+        const sheet = await createSheet(tokens, title, headers);
         res.json(sheet);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -106,6 +106,41 @@ router.post('/submit', async (req, res) => {
     }
 });
 
+// Get stats for dashboard
+router.get('/stats', requireAuth, async (req, res) => {
+    try {
+        if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+        const { data: forms, error: formsError } = await supabase
+            .from('forms')
+            .select('id')
+            .eq('user_id', req.user.id);
+
+        if (formsError) throw formsError;
+
+        const formCount = forms?.length || 0;
+        if (formCount === 0) {
+            return res.json({ totalForms: 0, totalResponses: 0 });
+        }
+
+        const formIds = forms.map(f => f.id);
+        const { count, error: respError } = await supabase
+            .from('responses')
+            .select('*', { count: 'exact', head: true })
+            .in('form_id', formIds);
+
+        if (respError) throw respError;
+
+        res.json({
+            totalForms: formCount,
+            totalResponses: count || 0
+        });
+    } catch (err) {
+        console.error('Error fetching stats:', err);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
 // Get user's forms
 router.get('/forms', requireAuth, async (req, res) => {
     try {
@@ -135,8 +170,7 @@ router.get('/forms', requireAuth, async (req, res) => {
 // Get all responses for all forms owned by the user
 router.get('/responses', requireAuth, async (req, res) => {
     try {
-        if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-
+        console.log('Fetching all responses for user:', req.user.id);
         // First find forms owned by user
         const { data: forms, error: formsError } = await supabase
             .from('forms')
@@ -144,9 +178,14 @@ router.get('/responses', requireAuth, async (req, res) => {
             .eq('user_id', req.user.id);
 
         if (formsError) throw formsError;
-        if (!forms || forms.length === 0) return res.json([]);
+
+        if (!forms || forms.length === 0) {
+            console.log('No forms found for user');
+            return res.json([]);
+        }
 
         const formIds = forms.map(f => f.id);
+        console.log('User form IDs:', formIds);
 
         // Then fetch responses for those forms
         const { data: responses, error } = await supabase
@@ -156,6 +195,7 @@ router.get('/responses', requireAuth, async (req, res) => {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
+        console.log(`Found ${responses?.length || 0} responses in Supabase`);
 
         res.json(responses);
     } catch (err) {
