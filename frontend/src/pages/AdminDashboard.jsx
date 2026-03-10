@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getForms, getResponsesLocal, deleteForm } from '../utils/storage';
 import { PlusCircle, Edit, Trash2, Link as LinkIcon, FileText, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../utils/supabase';
 
 export default function AdminDashboard() {
     const [forms, setForms] = useState([]);
