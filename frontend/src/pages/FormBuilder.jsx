@@ -1100,13 +1100,16 @@ export default function FormBuilder() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto w-full flex justify-center bg-gray-100 py-6">
+                            <div className={`flex-1 overflow-y-auto w-full flex justify-center py-6 transition-colors duration-300 ${form.theme?.mode === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
                                 <div
-                                    className={`bg-white shadow-xl overflow-y-auto transition-all duration-300 relative ${devicePreview === 'mobile' ? 'w-[320px] rounded-3xl border-[8px] border-gray-200 h-[568px]' : 'w-full max-w-2xl rounded-xl h-full'}`}
-                                    style={{ backgroundColor: form.theme?.backgroundColor || '#ffffff' }}
+                                    className={`shadow-xl overflow-y-auto transition-all duration-300 relative flex flex-col ${devicePreview === 'mobile' ? 'w-[320px] rounded-[32px] border-[8px] border-gray-900 h-[568px] sticky top-0' : 'w-full max-w-2xl rounded-xl h-fit min-h-full'}`}
+                                    style={{
+                                        backgroundColor: form.theme?.mode === 'dark' ? '#111827' : (form.theme?.backgroundColor || '#ffffff'),
+                                        color: form.theme?.mode === 'dark' ? '#ffffff' : (form.theme?.textColor || '#111827')
+                                    }}
                                 >
                                     {form.theme?.backgroundImageUrl && (
-                                        <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
+                                        <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
                                             <img src={form.theme.backgroundImageUrl} className="w-full h-full object-cover" alt="" />
                                         </div>
                                     )}
@@ -1133,12 +1136,12 @@ export default function FormBuilder() {
                                                             type={q.type}
                                                             value={previewAnswers[q.id] || ''}
                                                             onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                                            className="w-full p-2.5 rounded-lg border border-gray-300 bg-white"
+                                                            className={`w-full p-2.5 rounded-lg border bg-transparent transition-all outline-none focus:ring-2 focus:ring-primary-500/20 ${form.theme?.mode === 'dark' ? 'border-white/10 text-white placeholder:text-white/20' : 'border-gray-200 text-gray-900 placeholder:text-gray-400'}`}
                                                             placeholder="Your answer..."
                                                         />
                                                     ) : q.type === 'textarea' ? (
                                                         <textarea
-                                                            className="w-full p-2.5 rounded-lg border border-gray-300 bg-white"
+                                                            className={`w-full p-2.5 rounded-lg border bg-transparent transition-all outline-none focus:ring-2 focus:ring-primary-500/20 ${form.theme?.mode === 'dark' ? 'border-white/10 text-white placeholder:text-white/20' : 'border-gray-200 text-gray-900 placeholder:text-gray-400'}`}
                                                             rows="3"
                                                             placeholder="Your answer..."
                                                             value={previewAnswers[q.id] || ''}
@@ -1149,11 +1152,11 @@ export default function FormBuilder() {
                                                             <select
                                                                 value={previewAnswers[q.id] || ''}
                                                                 onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                                                className="w-full p-2 rounded-lg border border-gray-200 text-sm bg-gray-50 outline-none appearance-none cursor-pointer"
+                                                                className={`w-full p-2 rounded-lg border transition-all outline-none appearance-none cursor-pointer ${form.theme?.mode === 'dark' ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
                                                             >
-                                                                <option value="">Select an option...</option>
+                                                                <option value="" className={form.theme?.mode === 'dark' ? 'bg-gray-900' : 'bg-white'}>Select an option...</option>
                                                                 {q.options?.map((opt, i) => (
-                                                                    <option key={i} value={opt}>{opt}</option>
+                                                                    <option key={i} value={opt} className={form.theme?.mode === 'dark' ? 'bg-gray-900' : 'bg-white'}>{opt}</option>
                                                                 ))}
                                                             </select>
                                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -1197,15 +1200,15 @@ export default function FormBuilder() {
                                                                 <div key={i} className="space-y-1">
                                                                     <div
                                                                         onClick={() => setPreviewExpandedCat(previewExpandedCat === i ? null : i)}
-                                                                        className={`flex items-center gap-2 p-2 rounded border transition-all cursor-pointer ${previewExpandedCat === i ? 'border-primary-500 bg-white' : 'bg-gray-50 hover:bg-white'}`}
+                                                                        className={`flex items-center gap-2 p-2 rounded border transition-all cursor-pointer ${previewExpandedCat === i ? 'border-primary-500 bg-primary-500/5' : (form.theme?.mode === 'dark' ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-gray-50 border-gray-100 hover:bg-white')}`}
                                                                     >
-                                                                        <span className={`text-xs font-bold capitalize ${previewExpandedCat === i ? 'text-primary-600' : 'text-gray-500'}`}>{cat.label || 'Category'}</span>
-                                                                        <div className={`ml-auto w-2 h-2 border-b-2 border-r-2 border-gray-400 transition-transform ${previewExpandedCat === i ? '-rotate-135' : 'rotate-45'}`} />
+                                                                        <span className={`text-xs font-bold capitalize ${previewExpandedCat === i ? 'text-primary-600' : (form.theme?.mode === 'dark' ? 'text-white/60' : 'text-gray-500')}`}>{cat.label || 'Category'}</span>
+                                                                        <div className={`ml-auto w-2 h-2 border-b-2 border-r-2 transition-transform ${previewExpandedCat === i ? '-rotate-135 border-primary-500' : 'rotate-45 border-gray-400'}`} />
                                                                     </div>
                                                                     {previewExpandedCat === i && (
                                                                         <div className="pl-4 space-y-1">
                                                                             {cat.items?.map((item, j) => (
-                                                                                <div key={j} className="p-2 bg-white border border-gray-100 rounded text-[10px] text-gray-600 font-medium">
+                                                                                <div key={j} className={`p-2 rounded text-[10px] font-medium border transition-all ${form.theme?.mode === 'dark' ? 'bg-white/5 border-white/5 text-white/80' : 'bg-white border-gray-100 text-gray-600'}`}>
                                                                                     {item.label}
                                                                                 </div>
                                                                             ))}
