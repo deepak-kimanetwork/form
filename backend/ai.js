@@ -93,15 +93,17 @@ Structure:
       "id": "q_1",
       "sectionId": "sec_1",
       "label": "Question text",
-      "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | welcome-screen | yes-no",
+      "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | welcome-screen | yes-no | nested-choice",
       "required": true,
       "options": ["Opt 1", "Opt 2"], // if type is 'select', 'dropdown' or 'multiple-choice'
+      "nestedOptions": [{"label": "Group 1", "subOptions": ["A", "B"]}], // ONLY if type is 'nested-choice'
       "logic": [
         { "condition": "equals | not_equals | contains | greater_than | less_than", "value": "Value", "target": "target_q_id" }
       ]
     }
   ]
 }
+For 'nested-choice', use 'nestedOptions' instead of 'options'. 
 For multiple-choice logic, if the user selects ANY of the options in the rule, it should trigger.
 Do not use Markdown backticks. Provide raw JSON only. Ensure use of valid JSON.`;
 
@@ -182,9 +184,10 @@ Generate 1-3 appropriate new questions as a JSON array of objects.
 Question Object Structure:
 {
   "label": "Question text",
-  "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | yes-no",
+  "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | yes-no | nested-choice",
   "required": true,
-  "options": ["Opt 1", "Opt 2"] // if type is 'select', 'dropdown' or 'multiple-choice'
+  "options": ["Opt 1", "Opt 2"], // if type is 'select', 'dropdown' or 'multiple-choice'
+  "nestedOptions": [{"label": "Category 1", "subOptions": ["Sub 1", "Sub 2"]}] // ONLY if type is 'nested-choice'
 }
 Do not include existing questions. Return ONLY the new questions.
 Strict raw JSON array only.`;

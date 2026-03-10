@@ -11,6 +11,7 @@ export default function PublicForm() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [history, setHistory] = useState([0]); // Stack of visited indices
     const [answers, setAnswers] = useState({});
+    const [activeCategory, setActiveCategory] = useState(null);
     const [direction, setDirection] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const submittingRef = useRef(false);
@@ -71,6 +72,9 @@ export default function PublicForm() {
     const handleNext = async () => {
         if (!currentQ) return;
         const currentAnswer = answers[currentQ.label];
+
+        // Reset active category for nested choices
+        setActiveCategory(null);
 
         // Validation 
         if (currentQ.required) {
@@ -439,6 +443,58 @@ export default function PublicForm() {
                                                 <div className={`w-3 h-3 border-b-2 border-r-2 rotate-45 ${isDark ? 'border-white' : 'border-black'}`} />
                                             </div>
                                         </div>
+                                    ) : currentQ?.type === 'nested-choice' ? (
+                                        <div className="space-y-4">
+                                            {(currentQ.nestedOptions || []).map((cat, i) => {
+                                                const isOpen = activeCategory === i;
+                                                const selectedSub = answers[currentQ.label]?.startsWith(`${cat.label}: `)
+                                                    ? answers[currentQ.label].replace(`${cat.label}: `, '')
+                                                    : null;
+
+                                                return (
+                                                    <div key={i} className={`rounded-2xl border-2 transition-all overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'} ${isOpen ? 'bg-white/5 border-primary-500/50' : 'hover:border-primary-500/30'}`}>
+                                                        <button
+                                                            onClick={() => setActiveCategory(isOpen ? null : i)}
+                                                            className="w-full p-5 flex items-center justify-between text-left group"
+                                                        >
+                                                            <span className="text-xl font-bold opacity-80 group-hover:opacity-100 transition-opacity">{cat.label}</span>
+                                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isOpen ? 'border-primary-500 bg-primary-500 text-white rotate-180' : 'border-gray-400 opacity-50'}`}>
+                                                                <div className={`w-2 h-2 border-b-2 border-r-2 rotate-45 transform -translate-y-0.5`} />
+                                                            </div>
+                                                        </button>
+
+                                                        <AnimatePresence>
+                                                            {isOpen && (
+                                                                <motion.div
+                                                                    initial={{ height: 0, opacity: 0 }}
+                                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                                    exit={{ height: 0, opacity: 0 }}
+                                                                    className="px-5 pb-5 space-y-2"
+                                                                >
+                                                                    {(cat.subOptions || []).map((sub, j) => (
+                                                                        <button
+                                                                            key={j}
+                                                                            onClick={() => {
+                                                                                setAnswers(a => ({ ...a, [currentQ.label]: `${cat.label}: ${sub}` }));
+                                                                                setTimeout(handleNext, 400);
+                                                                            }}
+                                                                            className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all ${selectedSub === sub ? 'bg-primary-500/20 text-primary-500 font-bold' : 'hover:bg-white/5 opacity-60 hover:opacity-100'}`}
+                                                                        >
+                                                                            <span>{sub}</span>
+                                                                            {selectedSub === sub && (
+                                                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                                                                                    <Check className="w-5 h-5" />
+                                                                                </motion.div>
+                                                                            )}
+                                                                        </button>
+                                                                    ))}
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     ) : currentQ?.type === 'yes-no' ? (
                                         <div className="flex gap-4">
                                             {['Yes', 'No'].map(opt => (
@@ -506,7 +562,7 @@ export default function PublicForm() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'select', 'dropdown', 'welcome-screen'].includes(currentQ?.type) && (
+                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'select', 'dropdown', 'nested-choice', 'welcome-screen'].includes(currentQ?.type) && (
                                 <button
                                     onClick={handleNext}
                                     disabled={isSubmitting || isAiLoading}

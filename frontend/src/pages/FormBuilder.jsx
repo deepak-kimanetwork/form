@@ -15,8 +15,9 @@ import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
 import { supabase } from '../utils/supabase';
 import { checkCustomUrl } from '../utils/storage';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
+const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no', 'nested-choice'];
 
 function SortableItem({ id, question, allQuestions, updateQuestion, removeQuestion }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -125,6 +126,67 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                 updateQuestion(id, 'options', newOpts);
                             }} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                                 + Add Option
+                            </button>
+                        </div>
+                    )}
+
+                    {question.type === 'nested-choice' && (
+                        <div className="pt-2 space-y-4">
+                            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Nested Categories & Options</p>
+                            {(question.nestedOptions || []).map((cat, catIdx) => (
+                                <div key={catIdx} className="p-3 border border-gray-100 rounded-lg bg-gray-50/50 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={cat.label}
+                                            onChange={(e) => {
+                                                const newNested = [...question.nestedOptions];
+                                                newNested[catIdx].label = e.target.value;
+                                                updateQuestion(id, 'nestedOptions', newNested);
+                                            }}
+                                            placeholder="Category Name (e.g. Fruits)"
+                                            className="flex-1 text-sm font-bold bg-transparent border-b border-gray-200 focus:border-primary-500 outline-none pb-1"
+                                        />
+                                        <button onClick={() => {
+                                            const newNested = question.nestedOptions.filter((_, i) => i !== catIdx);
+                                            updateQuestion(id, 'nestedOptions', newNested);
+                                        }} className="text-gray-400 hover:text-red-500 text-xs">Remove</button>
+                                    </div>
+                                    <div className="pl-4 space-y-2">
+                                        {(cat.subOptions || []).map((sub, subIdx) => (
+                                            <div key={subIdx} className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                                                <input
+                                                    type="text"
+                                                    value={sub}
+                                                    onChange={(e) => {
+                                                        const newNested = [...question.nestedOptions];
+                                                        newNested[catIdx].subOptions[subIdx] = e.target.value;
+                                                        updateQuestion(id, 'nestedOptions', newNested);
+                                                    }}
+                                                    placeholder="Sub-option"
+                                                    className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-500 outline-none"
+                                                />
+                                                <button onClick={() => {
+                                                    const newNested = [...question.nestedOptions];
+                                                    newNested[catIdx].subOptions = newNested[catIdx].subOptions.filter((_, i) => i !== subIdx);
+                                                    updateQuestion(id, 'nestedOptions', newNested);
+                                                }} className="text-gray-300 hover:text-red-500">&times;</button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => {
+                                            const newNested = [...question.nestedOptions];
+                                            newNested[catIdx].subOptions = [...(newNested[catIdx].subOptions || []), ''];
+                                            updateQuestion(id, 'nestedOptions', newNested);
+                                        }} className="text-[10px] font-bold text-gray-400 hover:text-primary-600 uppercase tracking-tighter">+ Add Sub-option</button>
+                                    </div>
+                                </div>
+                            ))}
+                            <button onClick={() => {
+                                const newNested = [...(question.nestedOptions || []), { label: '', subOptions: [''] }];
+                                updateQuestion(id, 'nestedOptions', newNested);
+                            }} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs font-bold text-gray-400 hover:border-primary-200 hover:text-primary-600 transition-all">
+                                + Add New Category
                             </button>
                         </div>
                     )}
@@ -951,6 +1013,17 @@ export default function FormBuilder() {
                                                                 <div key={i} className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-white opacity-70">
                                                                     <input disabled type={q.type === 'select' ? 'radio' : 'checkbox'} className="w-4 h-4" />
                                                                     <span className="text-sm">{opt}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : q.type === 'nested-choice' ? (
+                                                        <div className="space-y-2">
+                                                            {q.nestedOptions?.map((cat, i) => (
+                                                                <div key={i} className="space-y-1">
+                                                                    <div className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-gray-50 opacity-70">
+                                                                        <span className="text-xs font-bold text-gray-400 capitalize">{cat.label || 'Category'}</span>
+                                                                        <div className="ml-auto w-3 h-3 border-b border-r border-gray-300 rotate-45" />
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
