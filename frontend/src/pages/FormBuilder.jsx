@@ -384,6 +384,10 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
     );
 }
 
+const escapeRegExp = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+};
+
 export default function FormBuilder() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -418,6 +422,8 @@ export default function FormBuilder() {
     const [isExporting, setIsExporting] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
     const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+    const [previewAnswers, setPreviewAnswers] = useState({});
+    const [previewExpandedCat, setPreviewExpandedCat] = useState(null);
 
     useEffect(() => {
         const handleMessage = (event) => {
@@ -1123,12 +1129,28 @@ export default function FormBuilder() {
                                                     </label>
 
                                                     {q.type === 'text' || q.type === 'email' || q.type === 'number' ? (
-                                                        <input disabled type={q.type} className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" placeholder="Your answer..." />
+                                                        <input
+                                                            type={q.type}
+                                                            value={previewAnswers[q.id] || ''}
+                                                            onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                                            className="w-full p-2.5 rounded-lg border border-gray-300 bg-white"
+                                                            placeholder="Your answer..."
+                                                        />
                                                     ) : q.type === 'textarea' ? (
-                                                        <textarea disabled className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" rows="3" placeholder="Your answer..."></textarea>
+                                                        <textarea
+                                                            className="w-full p-2.5 rounded-lg border border-gray-300 bg-white"
+                                                            rows="3"
+                                                            placeholder="Your answer..."
+                                                            value={previewAnswers[q.id] || ''}
+                                                            onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                                        ></textarea>
                                                     ) : q.type === 'dropdown' ? (
                                                         <div className="relative">
-                                                            <select className="w-full p-2 rounded-lg border border-gray-200 text-sm bg-gray-50 outline-none appearance-none cursor-pointer">
+                                                            <select
+                                                                value={previewAnswers[q.id] || ''}
+                                                                onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                                                className="w-full p-2 rounded-lg border border-gray-200 text-sm bg-gray-50 outline-none appearance-none cursor-pointer"
+                                                            >
                                                                 <option value="">Select an option...</option>
                                                                 {q.options?.map((opt, i) => (
                                                                     <option key={i} value={opt}>{opt}</option>
@@ -1140,32 +1162,105 @@ export default function FormBuilder() {
                                                         </div>
                                                     ) : (q.type === 'select' || q.type === 'multiple-choice') ? (
                                                         <div className="space-y-2">
-                                                            {q.options?.map((opt, i) => (
-                                                                <div key={i} className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-white opacity-70">
-                                                                    <input disabled type={q.type === 'select' ? 'radio' : 'checkbox'} className="w-4 h-4" />
-                                                                    <span className="text-sm">{opt}</span>
-                                                                </div>
-                                                            ))}
+                                                            {q.options?.map((opt, i) => {
+                                                                const isChecked = q.type === 'select'
+                                                                    ? previewAnswers[q.id] === opt
+                                                                    : (previewAnswers[q.id] || '').split(', ').includes(opt);
+                                                                return (
+                                                                    <div
+                                                                        key={i}
+                                                                        onClick={() => {
+                                                                            if (q.type === 'select') {
+                                                                                setPreviewAnswers(prev => ({ ...prev, [q.id]: opt }));
+                                                                            } else {
+                                                                                const current = (previewAnswers[q.id] || '').split(', ').filter(Boolean);
+                                                                                const next = current.includes(opt) ? current.filter(x => x !== opt) : [...current, opt];
+                                                                                setPreviewAnswers(prev => ({ ...prev, [q.id]: next.join(', ') }));
+                                                                            }
+                                                                        }}
+                                                                        className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${isChecked ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-primary-200'}`}
+                                                                    >
+                                                                        <input
+                                                                            readOnly
+                                                                            type={q.type === 'select' ? 'radio' : 'checkbox'}
+                                                                            checked={isChecked}
+                                                                            className="w-4 h-4 pointer-events-none"
+                                                                        />
+                                                                        <span className="text-sm">{opt}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     ) : q.type === 'nested-choice' ? (
                                                         <div className="space-y-2">
                                                             {q.nestedOptions?.map((cat, i) => (
                                                                 <div key={i} className="space-y-1">
-                                                                    <div className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-gray-50 opacity-70">
-                                                                        <span className="text-xs font-bold text-gray-400 capitalize">{cat.label || 'Category'}</span>
-                                                                        <div className="ml-auto w-3 h-3 border-b border-r border-gray-300 rotate-45" />
+                                                                    <div
+                                                                        onClick={() => setPreviewExpandedCat(previewExpandedCat === i ? null : i)}
+                                                                        className={`flex items-center gap-2 p-2 rounded border transition-all cursor-pointer ${previewExpandedCat === i ? 'border-primary-500 bg-white' : 'bg-gray-50 hover:bg-white'}`}
+                                                                    >
+                                                                        <span className={`text-xs font-bold capitalize ${previewExpandedCat === i ? 'text-primary-600' : 'text-gray-500'}`}>{cat.label || 'Category'}</span>
+                                                                        <div className={`ml-auto w-2 h-2 border-b-2 border-r-2 border-gray-400 transition-transform ${previewExpandedCat === i ? '-rotate-135' : 'rotate-45'}`} />
                                                                     </div>
+                                                                    {previewExpandedCat === i && (
+                                                                        <div className="pl-4 space-y-1">
+                                                                            {cat.items?.map((item, j) => (
+                                                                                <div key={j} className="p-2 bg-white border border-gray-100 rounded text-[10px] text-gray-600 font-medium">
+                                                                                    {item.label}
+                                                                                </div>
+                                                                            ))}
+                                                                            {(!cat.items || cat.items.length === 0) && (
+                                                                                <div className="text-[10px] text-gray-400 italic pl-2">No items</div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : q.type === 'rating' ? (
                                                         <div className="flex gap-2">
                                                             {[1, 2, 3, 4, 5].map(star => (
-                                                                <div key={star} className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold opacity-70">{star}</div>
+                                                                <button
+                                                                    key={star}
+                                                                    onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: star }))}
+                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${previewAnswers[q.id] === star ? 'bg-primary-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                                                >
+                                                                    {star}
+                                                                </button>
                                                             ))}
                                                         </div>
+                                                    ) : q.type === 'yes-no' ? (
+                                                        <div className="flex gap-4">
+                                                            {['Yes', 'No'].map(opt => (
+                                                                <button
+                                                                    key={opt}
+                                                                    onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                                                                    className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${previewAnswers[q.id] === opt ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-100 bg-white hover:border-primary-200'}`}
+                                                                >
+                                                                    {opt}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    ) : q.type === 'opinion-scale' ? (
+                                                        <div className="space-y-4">
+                                                            <div className="flex justify-between gap-1">
+                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(val => (
+                                                                    <button
+                                                                        key={val}
+                                                                        onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: val }))}
+                                                                        className={`flex-1 aspect-square sm:aspect-auto sm:h-12 rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold border-2 transition-all ${previewAnswers[q.id] === val ? 'bg-primary-600 border-primary-600 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-primary-200'}`}
+                                                                    >
+                                                                        {val}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <div className="flex justify-between text-[10px] font-bold text-gray-400 px-1 uppercase tracking-wider">
+                                                                <span>{q.leftLabel || 'Not at all likely'}</span>
+                                                                <span>{q.rightLabel || 'Extremely likely'}</span>
+                                                            </div>
+                                                        </div>
                                                     ) : (
-                                                        <div className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500 italic opacity-70">
+                                                        <div className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500 italic">
                                                             Interactive preview for {q.type}
                                                         </div>
                                                     )}
@@ -1174,8 +1269,12 @@ export default function FormBuilder() {
                                         </div>
 
                                         {form.questions.length > 0 && (
-                                            <button disabled className="mt-8 px-6 py-2.5 rounded-lg text-white font-bold w-full opacity-50" style={{ backgroundColor: form.theme?.primaryColor || '#22c55e', fontFamily: form.theme?.fontFamily || 'Inter' }}>
-                                                Submit
+                                            <button
+                                                onClick={() => alert(`Preview Submission:\n${JSON.stringify(previewAnswers, null, 2)}`)}
+                                                className="mt-8 px-6 py-2.5 rounded-lg text-white font-bold w-full hover:shadow-lg transition-all"
+                                                style={{ backgroundColor: form.theme?.primaryColor || '#22c55e', fontFamily: form.theme?.fontFamily || 'Inter' }}
+                                            >
+                                                Submit Test
                                             </button>
                                         )}
                                     </div>
