@@ -21,10 +21,20 @@ router.post('/generate-next', generateNextQuestion);
 router.post('/generate-more', generateMoreQuestions);
 router.post('/summary', generateResponseSummary);
 
+// Debug: Check what redirect URI the backend is actually using
+router.get('/debug/oauth', (req, res) => {
+    res.json({
+        GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || 'NOT SET (falling back to http://localhost:5000/api/auth/google/callback)',
+        GOOGLE_CLIENT_ID_SET: !!process.env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET_SET: !!process.env.GOOGLE_CLIENT_SECRET
+    });
+});
+
 // Google OAuth Routes
 router.get('/auth/google', (req, res) => {
     const { formId } = req.query;
     const url = getGoogleAuthUrl(formId);
+    console.log('OAuth redirect URL being used:', process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback');
     res.redirect(url);
 });
 
