@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getFormById, saveResponseLocal } from '../utils/storage';
 import { Check, ArrowRight, ArrowLeft, Loader2, Star } from 'lucide-react';
 
+const escapeRegExp = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+};
+
 export default function PublicForm() {
     const { formId } = useParams();
     const navigate = useNavigate();
@@ -448,32 +452,41 @@ export default function PublicForm() {
                                             </div>
                                         </div>
                                     ) : currentQ?.type === 'nested-choice' ? (
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             {(currentQ.nestedOptions || []).map((cat, i) => {
-                                                const isCatOpen = activeCategory === i;
-                                                const catAnswers = answers[currentQ.label] || '';
-                                                const hasSelectionInCat = catAnswers.startsWith(`${cat.label}: `);
+                                                const isCatActive = activeCategory === i;
+                                                const currentAnswers = answers[currentQ.label] || '';
+
+                                                // Check if this category has any selection in the string: "[CatLabel]"
+                                                const catMarker = `[${cat.label}]`;
+                                                const isCatSelected = currentAnswers.includes(catMarker);
 
                                                 return (
-                                                    <div key={i} className={`rounded-3xl border-2 transition-all overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'} ${isCatOpen ? 'bg-white/5 border-primary-500/50' : 'hover:border-primary-500/30'}`}>
+                                                    <div key={i} className={`rounded-3xl border-2 transition-all overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'} ${isCatActive ? 'bg-white/5 border-primary-500/50' : 'hover:border-primary-500/30'} ${isCatSelected ? 'ring-2 ring-primary-500/20' : ''}`}>
                                                         <button
                                                             onClick={() => {
-                                                                setActiveCategory(isCatOpen ? null : i);
-                                                                setActiveItem(null);
+                                                                if (currentQ.allowMultipleCategories) {
+                                                                    setActiveCategory(isCatActive ? null : i);
+                                                                } else {
+                                                                    setActiveCategory(isCatActive ? null : i);
+                                                                    setActiveItem(null);
+                                                                }
                                                             }}
                                                             className="w-full p-6 flex items-center justify-between text-left group"
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${isCatOpen ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-primary-50 group-hover:text-primary-500'}`}>{i + 1}</div>
+                                                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${isCatActive ? 'bg-primary-500 text-white' : (isCatSelected ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400 group-hover:bg-primary-50 group-hover:text-primary-500')}`}>
+                                                                    {isCatSelected ? <Check className="w-5 h-5" /> : i + 1}
+                                                                </div>
                                                                 <span className="text-2xl font-black opacity-80 group-hover:opacity-100 transition-opacity">{cat.label}</span>
                                                             </div>
-                                                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isCatOpen ? 'border-primary-500 bg-primary-500 text-white rotate-180' : 'border-gray-400 opacity-50'}`}>
+                                                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isCatActive ? 'border-primary-500 bg-primary-500 text-white rotate-180' : 'border-gray-400 opacity-50'}`}>
                                                                 <div className={`w-2.5 h-2.5 border-b-2 border-r-2 rotate-45 transform -translate-y-0.5`} />
                                                             </div>
                                                         </button>
 
                                                         <AnimatePresence>
-                                                            {isCatOpen && (
+                                                            {isCatActive && (
                                                                 <motion.div
                                                                     initial={{ height: 0, opacity: 0 }}
                                                                     animate={{ height: 'auto', opacity: 1 }}
@@ -481,61 +494,119 @@ export default function PublicForm() {
                                                                     className="px-6 pb-6 space-y-4"
                                                                 >
                                                                     {(cat.items || []).map((item, j) => {
-                                                                        const isItemOpen = activeItem === j;
-                                                                        const itemPrefix = `${cat.label}: ${item.label}`;
-                                                                        const currentSelection = catAnswers.startsWith(itemPrefix) ? catAnswers : '';
-                                                                        const selectedVariants = currentSelection.match(/\((.*)\)/)?.[1]?.split(', ') || [];
+                                                                        const isItemActive = activeItem === j;
+
+                                                                        // Check if item is selected in the current category's part of the answer string
+                                                                        const itemSelected = currentAnswers.includes(`${catMarker} ${item.label}`) || currentAnswers.includes(`, ${item.label}`);
 
                                                                         return (
-                                                                            <div key={j} className={`rounded-2xl border-2 transition-all ${isItemOpen ? 'border-blue-500/30 bg-blue-500/5' : 'border-gray-100'}`}>
+                                                                            <div key={j} className={`rounded-2xl border-2 transition-all ${isItemActive ? 'border-blue-500/30 bg-blue-500/5' : 'border-gray-100'}`}>
                                                                                 <button
-                                                                                    onClick={() => setActiveItem(isItemOpen ? null : j)}
-                                                                                    className="w-full p-4 flex items-center justify-between text-left group"
+                                                                                    onClick={() => setActiveItem(isItemActive ? null : j)}
+                                                                                    className="w-full p-4 flex items-start justify-between text-left group"
                                                                                 >
-                                                                                    <span className="font-bold text-lg text-gray-700 group-hover:text-blue-600 transition-colors">{item.label}</span>
-                                                                                    <Plus className={`w-5 h-5 transition-transform ${isItemOpen ? 'rotate-45 text-blue-500' : 'text-gray-400'}`} />
+                                                                                    <div className="flex-1">
+                                                                                        <span className={`font-bold text-lg transition-colors ${itemSelected ? 'text-primary-600' : 'text-gray-700 group-hover:text-blue-600'}`}>{item.label}</span>
+                                                                                        {item.description && <p className="text-xs text-gray-400 mt-0.5 font-medium">{item.description}</p>}
+                                                                                    </div>
+                                                                                    <Plus className={`w-5 h-5 transition-transform shrink-0 mt-1 ${isItemActive ? 'rotate-45 text-blue-500' : 'text-gray-400'}`} />
                                                                                 </button>
 
                                                                                 <AnimatePresence>
-                                                                                    {isItemOpen && (
+                                                                                    {isItemActive && (
                                                                                         <motion.div
                                                                                             initial={{ height: 0, opacity: 0 }}
                                                                                             animate={{ height: 'auto', opacity: 1 }}
                                                                                             exit={{ height: 0, opacity: 0 }}
-                                                                                            className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-2"
+                                                                                            className="px-4 pb-4 space-y-3"
                                                                                         >
-                                                                                            {(item.variants || []).map((v, k) => {
-                                                                                                const isSelected = selectedVariants.includes(v);
-                                                                                                return (
-                                                                                                    <button
-                                                                                                        key={k}
-                                                                                                        onClick={() => {
-                                                                                                            let newVariants;
-                                                                                                            if (currentQ.allowMultiple) {
-                                                                                                                newVariants = isSelected
-                                                                                                                    ? selectedVariants.filter(x => x !== v)
-                                                                                                                    : [...selectedVariants, v];
-                                                                                                            } else {
-                                                                                                                newVariants = [v];
-                                                                                                            }
+                                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                                                {(item.variants || []).map((v, k) => {
+                                                                                                    const vLabel = typeof v === 'string' ? v : v.label;
+                                                                                                    const vDesc = typeof v === 'string' ? '' : v.description;
 
-                                                                                                            const ansString = newVariants.length > 0
-                                                                                                                ? `${itemPrefix} (${newVariants.join(', ')})`
-                                                                                                                : '';
+                                                                                                    // More robust selection logic for variants in the answer string
+                                                                                                    const isSelected = currentAnswers.includes(`${item.label} (${vLabel})`) || currentAnswers.includes(`, ${vLabel}`);
 
-                                                                                                            setAnswers(a => ({ ...a, [currentQ.label]: ansString }));
+                                                                                                    return (
+                                                                                                        <button
+                                                                                                            key={k}
+                                                                                                            onClick={() => {
+                                                                                                                let currentAns = answers[currentQ.label] || '';
+                                                                                                                // Complex parsing/updating of the hierarchical answer string
+                                                                                                                // String format: "[Cat] Item (V1, V2), Item2; [Cat2] Item3"
 
-                                                                                                            if (!currentQ.allowMultiple && newVariants.length > 0) {
-                                                                                                                setTimeout(handleNext, 400);
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        className={`p-3 rounded-xl flex items-center justify-between text-left transition-all ${isSelected ? 'bg-primary-500 text-white font-bold shadow-lg shadow-primary-500/20' : 'bg-white border-2 border-gray-100 hover:border-primary-500/30'}`}
-                                                                                                    >
-                                                                                                        <span className="text-sm">{v}</span>
-                                                                                                        {isSelected && <Check className="w-4 h-4" />}
-                                                                                                    </button>
-                                                                                                );
-                                                                                            })}
+                                                                                                                const escapedV = escapeRegExp(vLabel);
+                                                                                                                const escapedItem = escapeRegExp(item.label);
+                                                                                                                const escapedCat = escapeRegExp(cat.label);
+
+                                                                                                                let newAns = '';
+                                                                                                                if (currentAns.includes(`[${cat.label}]`)) {
+                                                                                                                    // Already has category, update it
+                                                                                                                    if (currentAns.includes(`${item.label}`)) {
+                                                                                                                        // Already has item, toggle variant
+                                                                                                                        if (isSelected) {
+                                                                                                                            // Remove variant
+                                                                                                                            if (currentQ.allowMultipleVariants) {
+                                                                                                                                newAns = currentAns.replace(new RegExp(`, ${escapedV}(?=[\\),])|\\(${escapedV}, |\\(${escapedV}\\)`, 'g'), (m) => m.includes('(') && m.includes(')') ? '' : (m.startsWith('(') ? '(' : ''));
+                                                                                                                                // Clean up empty parens
+                                                                                                                                newAns = newAns.replace(/ \(\)/g, '').replace(/, ,/g, ',');
+                                                                                                                            } else {
+                                                                                                                                newAns = currentAns.replace(`${item.label} (${vLabel})`, '').replace(/; ;/g, ';').trim();
+                                                                                                                            }
+                                                                                                                        } else {
+                                                                                                                            // Add variant
+                                                                                                                            if (currentQ.allowMultipleVariants) {
+                                                                                                                                if (currentAns.includes(`${item.label} (`)) {
+                                                                                                                                    newAns = currentAns.replace(`${item.label} (`, `${item.label} (${vLabel}, `);
+                                                                                                                                } else {
+                                                                                                                                    newAns = currentAns.replace(`${item.label}`, `${item.label} (${vLabel})`);
+                                                                                                                                }
+                                                                                                                            } else {
+                                                                                                                                // Replace variant (single select)
+                                                                                                                                newAns = currentAns.replace(new RegExp(`${escapedItem} \\(.*?\\)`, 'g'), `${item.label} (${vLabel})`);
+                                                                                                                                if (!newAns.includes(`${item.label} (`)) newAns = currentAns.replace(`${item.label}`, `${item.label} (${vLabel})`);
+                                                                                                                            }
+                                                                                                                        }
+                                                                                                                    } else {
+                                                                                                                        // New item in existing category
+                                                                                                                        if (currentQ.allowMultipleItems) {
+                                                                                                                            newAns = currentAns.replace(`${catMarker}`, `${catMarker} ${item.label} (${vLabel}),`);
+                                                                                                                        } else {
+                                                                                                                            // Replace items in this category
+                                                                                                                            newAns = currentAns.replace(new RegExp(`\\[${escapedCat}\\].*?(?=;|$)`, 'g'), `${catMarker} ${item.label} (${vLabel})`);
+                                                                                                                        }
+                                                                                                                    }
+                                                                                                                } else {
+                                                                                                                    // New category
+                                                                                                                    if (currentQ.allowMultipleCategories) {
+                                                                                                                        newAns = currentAns + (currentAns ? '; ' : '') + `${catMarker} ${item.label} (${vLabel})`;
+                                                                                                                    } else {
+                                                                                                                        newAns = `${catMarker} ${item.label} (${vLabel})`;
+                                                                                                                    }
+                                                                                                                }
+
+                                                                                                                // Clean up commas/semicolons
+                                                                                                                newAns = newAns.replace(/, ,/g, ', ').replace(/, \)/g, ')').replace(/,;/g, ';').replace(/; ;/g, '; ').replace(/,$/g, '').trim();
+
+                                                                                                                setAnswers(a => ({ ...a, [currentQ.label]: newAns }));
+
+                                                                                                                // Auto advance if NO multi-select is enabled anywhere
+                                                                                                                if (!currentQ.allowMultipleCategories && !currentQ.allowMultipleItems && !currentQ.allowMultipleVariants) {
+                                                                                                                    setTimeout(handleNext, 400);
+                                                                                                                }
+                                                                                                            }}
+                                                                                                            className={`p-3 rounded-xl flex flex-col items-start text-left transition-all ${isSelected ? 'bg-primary-500 text-white font-bold shadow-lg shadow-primary-500/20' : 'bg-white border-2 border-gray-100 hover:border-primary-500/30'}`}
+                                                                                                        >
+                                                                                                            <div className="w-full flex items-center justify-between">
+                                                                                                                <span className="text-sm font-black">{vLabel}</span>
+                                                                                                                {isSelected && <Check className="w-4 h-4" />}
+                                                                                                            </div>
+                                                                                                            {vDesc && <p className={`text-[10px] mt-1 font-medium leading-tight ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>{vDesc}</p>}
+                                                                                                        </button>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </div>
                                                                                         </motion.div>
                                                                                     )}
                                                                                 </AnimatePresence>
@@ -548,6 +619,18 @@ export default function PublicForm() {
                                                     </div>
                                                 );
                                             })}
+
+                                            {(currentQ.allowMultipleCategories || currentQ.allowMultipleItems || currentQ.allowMultipleVariants) && (
+                                                <motion.button
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    onClick={handleNext}
+                                                    disabled={!answers[currentQ.label]}
+                                                    className="w-full py-5 bg-primary-600 text-white rounded-2xl font-black text-xl hover:bg-primary-700 transition-all shadow-xl shadow-primary-500/20 disabled:opacity-50 disabled:grayscale"
+                                                >
+                                                    Next / OK
+                                                </motion.button>
+                                            )}
                                         </div>
                                     ) : currentQ?.type === 'yes-no' ? (
                                         <div className="flex gap-4">

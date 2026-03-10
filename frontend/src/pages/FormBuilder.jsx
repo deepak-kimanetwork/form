@@ -132,16 +132,34 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
 
                     {question.type === 'nested-choice' && (
                         <div className="pt-2 space-y-6">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nested Categories & Options</p>
+                            <div className="flex flex-wrap items-center gap-6 pb-2 border-b border-gray-100">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Multi-Select Toggles</p>
                                 <label className="flex items-center gap-2 cursor-pointer group">
                                     <input
                                         type="checkbox"
-                                        checked={question.allowMultiple || false}
-                                        onChange={(e) => updateQuestion(id, 'allowMultiple', e.target.checked)}
-                                        className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                        checked={question.allowMultipleCategories || false}
+                                        onChange={(e) => updateQuestion(id, 'allowMultipleCategories', e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
                                     />
-                                    <span className="text-xs font-bold text-gray-600 group-hover:text-primary-600 transition-colors">Allow Multi-select Variants</span>
+                                    <span className="text-[10px] font-bold text-gray-500 group-hover:text-primary-600 transition-colors uppercase tracking-tight">Categories</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={question.allowMultipleItems || false}
+                                        onChange={(e) => updateQuestion(id, 'allowMultipleItems', e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                    />
+                                    <span className="text-[10px] font-bold text-gray-500 group-hover:text-primary-600 transition-colors uppercase tracking-tight">Items</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={question.allowMultipleVariants || false}
+                                        onChange={(e) => updateQuestion(id, 'allowMultipleVariants', e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                    />
+                                    <span className="text-[10px] font-bold text-gray-500 group-hover:text-primary-600 transition-colors uppercase tracking-tight">Variants</span>
                                 </label>
                             </div>
 
@@ -172,17 +190,30 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                         {(cat.items || []).map((item, itemIdx) => (
                                             <div key={itemIdx} className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                                 <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={item.label}
-                                                        onChange={(e) => {
-                                                            const newNested = [...question.nestedOptions];
-                                                            newNested[catIdx].items[itemIdx].label = e.target.value;
-                                                            updateQuestion(id, 'nestedOptions', newNested);
-                                                        }}
-                                                        placeholder="Item (e.g. Apple)"
-                                                        className="flex-1 text-xs font-bold bg-transparent border-b border-gray-200 focus:border-primary-500 outline-none transition-all"
-                                                    />
+                                                    <div className="flex-1 space-y-1">
+                                                        <input
+                                                            type="text"
+                                                            value={item.label}
+                                                            onChange={(e) => {
+                                                                const newNested = [...question.nestedOptions];
+                                                                newNested[catIdx].items[itemIdx].label = e.target.value;
+                                                                updateQuestion(id, 'nestedOptions', newNested);
+                                                            }}
+                                                            placeholder="Item Label (e.g. Apple)"
+                                                            className="w-full text-xs font-bold bg-transparent border-b border-gray-200 focus:border-primary-500 outline-none transition-all"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={item.description || ''}
+                                                            onChange={(e) => {
+                                                                const newNested = [...question.nestedOptions];
+                                                                newNested[catIdx].items[itemIdx].description = e.target.value;
+                                                                updateQuestion(id, 'nestedOptions', newNested);
+                                                            }}
+                                                            placeholder="Item Description (Optional)"
+                                                            className="w-full text-[10px] text-gray-400 bg-transparent border-b border-transparent focus:border-primary-300 outline-none transition-all"
+                                                        />
+                                                    </div>
                                                     <button onClick={() => {
                                                         const newNested = [...question.nestedOptions];
                                                         newNested[catIdx].items = newNested[catIdx].items.filter((_, i) => i !== itemIdx);
@@ -193,31 +224,52 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                                 <div className="pl-4 space-y-2">
                                                     <div className="flex flex-wrap gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Variants</div>
                                                     {(item.variants || []).map((variant, vIdx) => (
-                                                        <div key={vIdx} className="flex items-center gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                                                            <input
-                                                                type="text"
-                                                                value={variant}
-                                                                onChange={(e) => {
-                                                                    const newNested = [...question.nestedOptions];
-                                                                    newNested[catIdx].items[itemIdx].variants[vIdx] = e.target.value;
-                                                                    updateQuestion(id, 'nestedOptions', newNested);
-                                                                }}
-                                                                placeholder="Variant (e.g. Kashmiri)"
-                                                                className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-500 outline-none pb-0.5 transition-all"
-                                                            />
+                                                        <div key={vIdx} className="space-y-1 p-2 bg-white/50 rounded-lg border border-gray-100 flex items-start gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-primary-300 mt-1.5 shrink-0"></div>
+                                                            <div className="flex-1 space-y-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={typeof variant === 'string' ? variant : variant.label}
+                                                                    onChange={(e) => {
+                                                                        const newNested = [...question.nestedOptions];
+                                                                        if (typeof newNested[catIdx].items[itemIdx].variants[vIdx] === 'string') {
+                                                                            newNested[catIdx].items[itemIdx].variants[vIdx] = { label: e.target.value, description: '' };
+                                                                        } else {
+                                                                            newNested[catIdx].items[itemIdx].variants[vIdx].label = e.target.value;
+                                                                        }
+                                                                        updateQuestion(id, 'nestedOptions', newNested);
+                                                                    }}
+                                                                    placeholder="Variant Label (e.g. Kashmiri)"
+                                                                    className="w-full text-xs bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-500 outline-none pb-0.5 transition-all font-bold"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={variant.description || ''}
+                                                                    onChange={(e) => {
+                                                                        const newNested = [...question.nestedOptions];
+                                                                        if (typeof newNested[catIdx].items[itemIdx].variants[vIdx] === 'string') {
+                                                                            newNested[catIdx].items[itemIdx].variants[vIdx] = { label: newNested[catIdx].items[itemIdx].variants[vIdx], description: e.target.value };
+                                                                        } else {
+                                                                            newNested[catIdx].items[itemIdx].variants[vIdx].description = e.target.value;
+                                                                        }
+                                                                        updateQuestion(id, 'nestedOptions', newNested);
+                                                                    }}
+                                                                    placeholder="Variant Description (Optional)"
+                                                                    className="w-full text-[9px] text-gray-400 bg-transparent border-b border-transparent focus:border-primary-200 outline-none transition-all"
+                                                                />
+                                                            </div>
                                                             <button onClick={() => {
                                                                 const newNested = [...question.nestedOptions];
                                                                 newNested[catIdx].items[itemIdx].variants = newNested[catIdx].items[itemIdx].variants.filter((_, i) => i !== vIdx);
                                                                 updateQuestion(id, 'nestedOptions', newNested);
-                                                            }} className="text-gray-300 hover:text-red-400">&times;</button>
+                                                            }} className="text-gray-300 hover:text-red-400 p-1 shrink-0">&times;</button>
                                                         </div>
                                                     ))}
                                                     <button
                                                         onClick={() => {
                                                             const newNested = [...question.nestedOptions];
                                                             const variants = newNested[catIdx].items[itemIdx].variants || [];
-                                                            newNested[catIdx].items[itemIdx].variants = [...variants, `Variant ${variants.length + 1}`];
+                                                            newNested[catIdx].items[itemIdx].variants = [...variants, { label: `Variant ${variants.length + 1}`, description: '' }];
                                                             updateQuestion(id, 'nestedOptions', newNested);
                                                         }}
                                                         className="text-[10px] font-bold text-primary-500 hover:text-primary-700 bg-primary-50 px-2 py-1 rounded-md"
@@ -230,7 +282,7 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                         <button
                                             onClick={() => {
                                                 const newNested = [...question.nestedOptions];
-                                                newNested[catIdx].items = [...(newNested[catIdx].items || []), { label: `Item ${(newNested[catIdx].items?.length || 0) + 1}`, variants: [] }];
+                                                newNested[catIdx].items = [...(newNested[catIdx].items || []), { label: `Item ${(newNested[catIdx].items?.length || 0) + 1}`, description: '', variants: [] }];
                                                 updateQuestion(id, 'nestedOptions', newNested);
                                             }}
                                             className="text-xs font-bold text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg"
