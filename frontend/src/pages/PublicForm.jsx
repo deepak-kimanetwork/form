@@ -83,7 +83,9 @@ export default function PublicForm() {
 
         // Check for AI Follow-up (only for text types and only if not already an AI question)
         const isTextType = ['text', 'textarea'].includes(currentQ.type);
-        if (isTextType && !currentQ.isAiFollowUp && currentAnswer?.length > 3) {
+        const aiDisabled = theme.disableAiFollowUp === true;
+
+        if (isTextType && !currentQ.isAiFollowUp && !aiDisabled && currentAnswer?.length > 3) {
             await handleAiFollowUp(currentQ, currentAnswer);
             return;
         }
@@ -332,47 +334,28 @@ export default function PublicForm() {
                                             className={`w-full h-40 text-xl font-medium bg-transparent border-b-2 border-opacity-20 outline-none pb-2 transition-colors resize-none placeholder:opacity-30 ${isDark ? 'border-white' : 'border-black'}`}
                                             style={{ borderColor: answers[currentQ.label] ? theme.primaryColor : undefined }}
                                         />
-                                    ) : currentQ?.type === 'select' ? (
+                                    ) : (currentQ?.type === 'select' || currentQ?.type === 'multiple-choice') ? (
                                         <div className="space-y-3">
                                             {currentQ.options?.map((opt, i) => {
-                                                const isSelected = answers[currentQ.label] === opt;
+                                                const isMulti = currentQ.allowMultiple === true;
+                                                const currentAnswers = answers[currentQ.label] || (isMulti ? [] : '');
+                                                const isSelected = isMulti ? currentAnswers.includes(opt) : currentAnswers === opt;
+
                                                 return (
                                                     <button
                                                         key={i}
                                                         onClick={() => {
-                                                            setAnswers(a => ({ ...a, [currentQ.label]: opt }));
-                                                            setTimeout(handleNext, 300);
-                                                        }}
-                                                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${isSelected ? '' : 'border-opacity-20 hover:border-opacity-50'} ${isDark ? 'bg-white/5' : ''}`}
-                                                        style={{
-                                                            borderColor: isSelected ? theme.primaryColor : undefined,
-                                                            backgroundColor: isSelected ? `${theme.primaryColor}20` : undefined,
-                                                            color: isSelected ? (isDark ? '#fff' : theme.primaryColor) : undefined
-                                                        }}
-                                                    >
-                                                        <span className="text-lg font-medium">{opt}</span>
-                                                        {isSelected && <Check className="w-6 h-6" style={{ color: theme.primaryColor }} />}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : currentQ?.type === 'multiple-choice' ? (
-                                        <div className="space-y-3">
-                                            {currentQ.options?.map((opt, i) => {
-                                                const currentAnswers = answers[currentQ.label] || [];
-                                                const isSelected = currentAnswers.includes(opt);
-                                                return (
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => {
-                                                            setAnswers(a => {
-                                                                const arr = a[currentQ.label] || [];
+                                                            if (isMulti) {
+                                                                const arr = Array.isArray(currentAnswers) ? currentAnswers : [];
                                                                 if (arr.includes(opt)) {
-                                                                    return { ...a, [currentQ.label]: arr.filter(x => x !== opt) };
+                                                                    setAnswers(a => ({ ...a, [currentQ.label]: arr.filter(x => x !== opt) }));
                                                                 } else {
-                                                                    return { ...a, [currentQ.label]: [...arr, opt] };
+                                                                    setAnswers(a => ({ ...a, [currentQ.label]: [...arr, opt] }));
                                                                 }
-                                                            });
+                                                            } else {
+                                                                setAnswers(a => ({ ...a, [currentQ.label]: opt }));
+                                                                setTimeout(handleNext, 300);
+                                                            }
                                                         }}
                                                         className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${isSelected ? '' : 'border-opacity-20 hover:border-opacity-50'} ${isDark ? 'bg-white/5' : ''}`}
                                                         style={{
@@ -382,14 +365,18 @@ export default function PublicForm() {
                                                         }}
                                                     >
                                                         <span className="text-lg font-medium">{opt}</span>
-                                                        <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${isSelected ? '' : 'border-opacity-30'}`}
-                                                            style={{
-                                                                borderColor: isSelected ? theme.primaryColor : undefined,
-                                                                backgroundColor: isSelected ? theme.primaryColor : 'transparent',
-                                                                color: isSelected ? '#fff' : 'transparent'
-                                                            }}>
-                                                            {isSelected && <Check className="w-4 h-4" />}
-                                                        </div>
+                                                        {isMulti ? (
+                                                            <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${isSelected ? '' : 'border-opacity-30'}`}
+                                                                style={{
+                                                                    borderColor: isSelected ? theme.primaryColor : undefined,
+                                                                    backgroundColor: isSelected ? theme.primaryColor : 'transparent',
+                                                                    color: isSelected ? '#fff' : 'transparent'
+                                                                }}>
+                                                                {isSelected && <Check className="w-4 h-4" />}
+                                                            </div>
+                                                        ) : (
+                                                            isSelected && <Check className="w-6 h-6" style={{ color: theme.primaryColor }} />
+                                                        )}
                                                     </button>
                                                 );
                                             })}

@@ -9,7 +9,7 @@ import {
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
     Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle,
-    Database
+    Database, Sparkles, Info
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
@@ -42,24 +42,41 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                         className="w-full text-lg font-medium outline-none border-b border-transparent hover:border-gray-300 focus:border-primary-500 pb-1"
                     />
 
-                    <div className="flex gap-4 items-center">
+                    <div className="flex flex-wrap items-center gap-4 mb-3">
                         <select
                             value={question.type}
                             onChange={(e) => updateQuestion(id, 'type', e.target.value)}
-                            className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-100"
+                            className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary-100 transition-all capitalize"
                         >
-                            {questionTypes.map((t) => (
-                                <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                            {questionTypes.map(t => (
+                                <option key={t} value={t}>{t.replace('-', ' ')}</option>
                             ))}
                         </select>
-                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+
+                        {['select', 'multiple-choice'].includes(question.type) && (
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only"
+                                        checked={question.allowMultiple || false}
+                                        onChange={(e) => updateQuestion(id, 'allowMultiple', e.target.checked)}
+                                    />
+                                    <div className={`w-10 h-5 rounded-full transition-colors ${question.allowMultiple ? 'bg-primary-600' : 'bg-gray-300'}`} />
+                                    <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${question.allowMultiple ? 'translate-x-5' : ''}`} />
+                                </div>
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-700 transition-colors">Multiple Selection</span>
+                            </label>
+                        )}
+
+                        <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
-                                checked={question.required || false}
+                                checked={question.required}
                                 onChange={(e) => updateQuestion(id, 'required', e.target.checked)}
-                                className="rounded text-primary-600 focus:ring-primary-500"
+                                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
-                            Required
+                            <span className="text-sm font-medium text-gray-600">Required</span>
                         </label>
                     </div>
 
@@ -581,6 +598,31 @@ export default function FormBuilder() {
                                                 <option value="Playfair Display">Playfair (Serif)</option>
                                                 <option value="Space Mono">Space Mono (Tech)</option>
                                             </select>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-indigo-500 rounded-lg text-white">
+                                                        <Sparkles className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-indigo-900">AI Follow-ups</p>
+                                                        <p className="text-[10px] text-indigo-600 font-medium">Auto-generate conversational questions</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, disableAiFollowUp: !f.theme?.disableAiFollowUp } }))}
+                                                    className={`w-12 h-6 rounded-full transition-all relative ${!form.theme?.disableAiFollowUp ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${!form.theme?.disableAiFollowUp ? 'right-1' : 'left-1'}`} />
+                                                </button>
+                                            </div>
+                                            {form.theme?.disableAiFollowUp && (
+                                                <p className="text-[10px] text-gray-500 mt-2 px-1">
+                                                    <Info className="w-3 h-3 inline mr-1" /> AI follow-up questions are currently disabled.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
