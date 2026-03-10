@@ -93,9 +93,9 @@ Structure:
       "id": "q_1",
       "sectionId": "sec_1",
       "label": "Question text",
-      "type": "text | email | number | select | textarea | multiple-choice | rating | opinion-scale | welcome-screen | yes-no",
+      "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | welcome-screen | yes-no",
       "required": true,
-      "options": ["Opt 1", "Opt 2"], // if type is 'select' or 'multiple-choice'
+      "options": ["Opt 1", "Opt 2"], // if type is 'select', 'dropdown' or 'multiple-choice'
       "logic": [
         { "condition": "equals | not_equals | contains | greater_than | less_than", "value": "Value", "target": "target_q_id" }
       ]
@@ -166,5 +166,37 @@ Raw JSON only.`;
   } catch (error) {
     console.error('Error generating summary:', error);
     res.status(500).json({ error: 'Failed to generate summary' });
+  }
+};
+
+export const generateMoreQuestions = async (req, res) => {
+  try {
+    const { prompt, currentQuestions, formTitle } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+
+    const questions = await callWithRetry(async (client, modelName) => {
+      const model = client.getGenerativeModel({ model: modelName });
+      const systemPrompt = `You are an expert form creator. The user already has a form titled "${formTitle || 'Survey'}" with ${currentQuestions?.length || 0} questions.
+They want to add more questions based on this prompt: "${prompt}".
+Generate 1-3 appropriate new questions as a JSON array of objects.
+Question Object Structure:
+{
+  "label": "Question text",
+  "type": "text | email | number | select | dropdown | textarea | multiple-choice | rating | opinion-scale | yes-no",
+  "required": true,
+  "options": ["Opt 1", "Opt 2"] // if type is 'select', 'dropdown' or 'multiple-choice'
+}
+Do not include existing questions. Return ONLY the new questions.
+Strict raw JSON array only.`;
+
+      const result = await model.generateContent(`${systemPrompt}`);
+      const response = await result.response;
+      return extractJson(response.text());
+    });
+
+    return res.json({ questions: Array.isArray(questions) ? questions : [questions] });
+  } catch (error) {
+    console.error('Error generating more questions:', error);
+    res.status(500).json({ error: `Failed to generate questions: ${error.message}` });
   }
 };

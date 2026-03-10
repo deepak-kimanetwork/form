@@ -1,5 +1,4 @@
-import express from 'express';
-import { generateForm, generateNextQuestion, generateResponseSummary } from '../ai.js';
+import { generateForm, generateNextQuestion, generateResponseSummary, generateMoreQuestions } from '../ai.js';
 import { submitToSheets } from '../sheets.js';
 import { supabase } from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -8,6 +7,7 @@ const router = express.Router();
 
 router.post('/generate', generateForm);
 router.post('/generate-next', generateNextQuestion);
+router.post('/generate-more', generateMoreQuestions);
 router.post('/summary', generateResponseSummary);
 router.post('/submit', async (req, res) => {
     try {

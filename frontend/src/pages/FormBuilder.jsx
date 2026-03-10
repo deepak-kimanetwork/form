@@ -16,7 +16,7 @@ import WorkflowEditor from '../components/WorkflowEditor';
 import { supabase } from '../utils/supabase';
 import { checkCustomUrl } from '../utils/storage';
 
-const questionTypes = ['text', 'email', 'number', 'select', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
+const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no'];
 
 function SortableItem({ id, question, allQuestions, updateQuestion, removeQuestion }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -53,7 +53,7 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                             ))}
                         </select>
 
-                        {['select', 'multiple-choice'].includes(question.type) && (
+                        {['select', 'multiple-choice', 'dropdown'].includes(question.type) && (
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <div className="relative">
                                     <input
@@ -96,7 +96,7 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                         )}
                     </div>
 
-                    {(question.type === 'select' || question.type === 'multiple-choice') && (
+                    {(question.type === 'select' || question.type === 'multiple-choice' || question.type === 'dropdown') && (
                         <div className="pt-2">
                             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Options</p>
                             {question.options?.map((opt, idx) => (
@@ -239,6 +239,8 @@ export default function FormBuilder() {
     const [isUploading, setIsUploading] = useState(false);
     const [urlAvailable, setUrlAvailable] = useState(null);
     const [checkingUrl, setCheckingUrl] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -372,6 +374,41 @@ export default function FormBuilder() {
             setTimeout(() => {
                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             }, 100);
+        }
+    };
+
+    const generateAiQuestions = async () => {
+        if (!aiPrompt.trim()) return;
+        setIsGeneratingAi(true);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/generate-more`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: aiPrompt,
+                    currentQuestions: form.questions,
+                    formTitle: form.title
+                })
+            });
+            const data = await response.json();
+            if (data.questions) {
+                const newQs = data.questions.map(q => ({
+                    ...q,
+                    id: `q_${Math.random().toString(36).substr(2, 9)}`,
+                    sectionId: form.sections[0].id,
+                    logic: []
+                }));
+                setForm(f => ({ ...f, questions: [...f.questions, ...newQs] }));
+                setAiPrompt('');
+                setTimeout(() => {
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }, 100);
+            }
+        } catch (error) {
+            console.error('AI Generation error:', error);
+            alert('Failed to generate questions. Please try again.');
+        } finally {
+            setIsGeneratingAi(false);
         }
     };
 
@@ -756,19 +793,41 @@ export default function FormBuilder() {
 
             <main className="max-w-6xl mx-auto px-4 mt-8">
                 {activeTab === 'editor' && (
-                    <div className="flex gap-4 mb-6">
-                        <button
-                            onClick={() => addQuestion(form.sections[0]?.id, true)}
-                            className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all group"
-                        >
-                            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Question at Top
-                        </button>
-                        <button
-                            onClick={addSection}
-                            className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
-                        >
-                            <Layout className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Section
-                        </button>
+                    <div className="flex flex-col gap-4 mb-6">
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => addQuestion(form.sections[0]?.id, true)}
+                                className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all group"
+                            >
+                                <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Question at Top
+                            </button>
+                            <button
+                                onClick={addSection}
+                                className="flex-1 py-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold flex items-center justify-center gap-2 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
+                            >
+                                <Layout className="w-5 h-5 group-hover:scale-110 transition-transform" /> Add Section
+                            </button>
+                        </div>
+
+                        <div className="relative group">
+                            <input
+                                type="text"
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && generateAiQuestions()}
+                                placeholder="Tell AI to add more questions... (e.g. 'Add 3 questions about their experience')"
+                                className="w-full pl-12 pr-32 py-4 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-100 rounded-2xl text-gray-700 placeholder:text-purple-300 focus:ring-4 focus:ring-purple-100 focus:border-purple-300 outline-none transition-all"
+                            />
+                            <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-purple-400 animate-pulse" />
+                            <button
+                                onClick={generateAiQuestions}
+                                disabled={isGeneratingAi || !aiPrompt.trim()}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-200 transition-all disabled:opacity-50 disabled:shadow-none"
+                            >
+                                {isGeneratingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                {isGeneratingAi ? 'Generating...' : 'AI Generate'}
+                            </button>
+                        </div>
                     </div>
                 )}
                 {activeTab === 'editor' && (
@@ -874,7 +933,19 @@ export default function FormBuilder() {
                                                         <input disabled type={q.type} className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" placeholder="Your answer..." />
                                                     ) : q.type === 'textarea' ? (
                                                         <textarea disabled className="w-full p-2.5 rounded-lg border border-gray-300 bg-white opacity-70" rows="3" placeholder="Your answer..."></textarea>
-                                                    ) : q.type === 'select' || q.type === 'multiple-choice' ? (
+                                                    ) : q.type === 'dropdown' ? (
+                                                        <div className="relative">
+                                                            <select className="w-full p-2 rounded-lg border border-gray-200 text-sm bg-gray-50 outline-none appearance-none cursor-pointer">
+                                                                <option value="">Select an option...</option>
+                                                                {q.options?.map((opt, i) => (
+                                                                    <option key={i} value={opt}>{opt}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                                <div className="w-4 h-4 border-b-2 border-r-2 border-gray-400 rotate-45 mb-1" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (q.type === 'select' || q.type === 'multiple-choice') ? (
                                                         <div className="space-y-2">
                                                             {q.options?.map((opt, i) => (
                                                                 <div key={i} className="flex items-center gap-2 p-2 rounded border border-gray-200 bg-white opacity-70">

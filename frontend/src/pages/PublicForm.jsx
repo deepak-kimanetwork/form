@@ -413,6 +413,32 @@ export default function PublicForm() {
                                                 );
                                             })}
                                         </div>
+                                    ) : currentQ?.type === 'dropdown' ? (
+                                        <div className="relative group">
+                                            <select
+                                                value={answers[currentQ.label] || ''}
+                                                onChange={(e) => {
+                                                    setAnswers(a => ({ ...a, [currentQ.label]: e.target.value }));
+                                                    setTimeout(handleNext, 400);
+                                                }}
+                                                className={`w-full p-4 text-xl font-medium bg-transparent border-b-2 outline-none appearance-none cursor-pointer transition-all ${isDark ? 'border-white/20 hover:border-white/40' : 'border-black/20 hover:border-black/40'}`}
+                                                style={{ borderBottomColor: answers[currentQ.label] ? theme.primaryColor : undefined }}
+                                            >
+                                                <option value="" disabled className={isDark ? 'bg-gray-900 text-gray-500' : 'bg-white text-gray-400'}>Select an option...</option>
+                                                {currentQ.options?.map((opt, i) => (
+                                                    <option
+                                                        key={i}
+                                                        value={opt}
+                                                        className={isDark ? 'bg-gray-900 text-white' : 'bg-white text-black'}
+                                                    >
+                                                        {opt}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
+                                                <div className={`w-3 h-3 border-b-2 border-r-2 rotate-45 ${isDark ? 'border-white' : 'border-black'}`} />
+                                            </div>
+                                        </div>
                                     ) : currentQ?.type === 'yes-no' ? (
                                         <div className="flex gap-4">
                                             {['Yes', 'No'].map(opt => (
@@ -480,7 +506,7 @@ export default function PublicForm() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'select', 'welcome-screen'].includes(currentQ?.type) && (
+                            {['text', 'email', 'number', 'textarea', 'multiple-choice', 'select', 'dropdown', 'welcome-screen'].includes(currentQ?.type) && (
                                 <button
                                     onClick={handleNext}
                                     disabled={isSubmitting || isAiLoading}
