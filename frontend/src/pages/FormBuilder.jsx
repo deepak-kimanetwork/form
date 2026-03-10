@@ -131,11 +131,24 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                     )}
 
                     {question.type === 'nested-choice' && (
-                        <div className="pt-2 space-y-4">
-                            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Nested Categories & Options</p>
+                        <div className="pt-2 space-y-6">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nested Categories & Options</p>
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={question.allowMultiple || false}
+                                        onChange={(e) => updateQuestion(id, 'allowMultiple', e.target.checked)}
+                                        className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                    />
+                                    <span className="text-xs font-bold text-gray-600 group-hover:text-primary-600 transition-colors">Allow Multi-select Variants</span>
+                                </label>
+                            </div>
+
                             {(question.nestedOptions || []).map((cat, catIdx) => (
-                                <div key={catIdx} className="p-3 border border-gray-100 rounded-lg bg-gray-50/50 space-y-2">
+                                <div key={catIdx} className="p-4 border-2 border-gray-100 rounded-2xl bg-white shadow-sm space-y-4">
                                     <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600 font-bold text-xs">{catIdx + 1}</div>
                                         <input
                                             type="text"
                                             value={cat.label}
@@ -144,49 +157,94 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                                 newNested[catIdx].label = e.target.value;
                                                 updateQuestion(id, 'nestedOptions', newNested);
                                             }}
-                                            placeholder="Category Name (e.g. Fruits)"
-                                            className="flex-1 text-sm font-bold bg-transparent border-b border-gray-200 focus:border-primary-500 outline-none pb-1"
+                                            placeholder="Category (e.g. Fruits)"
+                                            className="flex-1 text-sm font-black bg-transparent border-b-2 border-transparent focus:border-primary-500 outline-none pb-1 transition-all"
                                         />
                                         <button onClick={() => {
                                             const newNested = question.nestedOptions.filter((_, i) => i !== catIdx);
                                             updateQuestion(id, 'nestedOptions', newNested);
-                                        }} className="text-gray-400 hover:text-red-500 text-xs">Remove</button>
+                                        }} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                            &times;
+                                        </button>
                                     </div>
-                                    <div className="pl-4 space-y-2">
-                                        {(cat.subOptions || []).map((sub, subIdx) => (
-                                            <div key={subIdx} className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                                                <input
-                                                    type="text"
-                                                    value={sub}
-                                                    onChange={(e) => {
+
+                                    <div className="pl-10 space-y-4 border-l-2 border-gray-50">
+                                        {(cat.items || []).map((item, itemIdx) => (
+                                            <div key={itemIdx} className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={item.label}
+                                                        onChange={(e) => {
+                                                            const newNested = [...question.nestedOptions];
+                                                            newNested[catIdx].items[itemIdx].label = e.target.value;
+                                                            updateQuestion(id, 'nestedOptions', newNested);
+                                                        }}
+                                                        placeholder="Item (e.g. Apple)"
+                                                        className="flex-1 text-xs font-bold bg-transparent border-b border-gray-200 focus:border-primary-500 outline-none transition-all"
+                                                    />
+                                                    <button onClick={() => {
                                                         const newNested = [...question.nestedOptions];
-                                                        newNested[catIdx].subOptions[subIdx] = e.target.value;
+                                                        newNested[catIdx].items = newNested[catIdx].items.filter((_, i) => i !== itemIdx);
                                                         updateQuestion(id, 'nestedOptions', newNested);
-                                                    }}
-                                                    placeholder="Sub-option"
-                                                    className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-500 outline-none"
-                                                />
-                                                <button onClick={() => {
-                                                    const newNested = [...question.nestedOptions];
-                                                    newNested[catIdx].subOptions = newNested[catIdx].subOptions.filter((_, i) => i !== subIdx);
-                                                    updateQuestion(id, 'nestedOptions', newNested);
-                                                }} className="text-gray-300 hover:text-red-500">&times;</button>
+                                                    }} className="text-gray-400 hover:text-red-500">&times;</button>
+                                                </div>
+
+                                                <div className="pl-4 space-y-2">
+                                                    <div className="flex flex-wrap gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Variants</div>
+                                                    {(item.variants || []).map((variant, vIdx) => (
+                                                        <div key={vIdx} className="flex items-center gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                                                            <input
+                                                                type="text"
+                                                                value={variant}
+                                                                onChange={(e) => {
+                                                                    const newNested = [...question.nestedOptions];
+                                                                    newNested[catIdx].items[itemIdx].variants[vIdx] = e.target.value;
+                                                                    updateQuestion(id, 'nestedOptions', newNested);
+                                                                }}
+                                                                placeholder="Variant (e.g. Kashmiri)"
+                                                                className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-500 outline-none pb-0.5 transition-all"
+                                                            />
+                                                            <button onClick={() => {
+                                                                const newNested = [...question.nestedOptions];
+                                                                newNested[catIdx].items[itemIdx].variants = newNested[catIdx].items[itemIdx].variants.filter((_, i) => i !== vIdx);
+                                                                updateQuestion(id, 'nestedOptions', newNested);
+                                                            }} className="text-gray-300 hover:text-red-400">&times;</button>
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => {
+                                                            const newNested = [...question.nestedOptions];
+                                                            const variants = newNested[catIdx].items[itemIdx].variants || [];
+                                                            newNested[catIdx].items[itemIdx].variants = [...variants, `Variant ${variants.length + 1}`];
+                                                            updateQuestion(id, 'nestedOptions', newNested);
+                                                        }}
+                                                        className="text-[10px] font-bold text-primary-500 hover:text-primary-700 bg-primary-50 px-2 py-1 rounded-md"
+                                                    >
+                                                        + Add Variant
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
-                                        <button onClick={() => {
-                                            const newNested = [...question.nestedOptions];
-                                            newNested[catIdx].subOptions = [...(newNested[catIdx].subOptions || []), ''];
-                                            updateQuestion(id, 'nestedOptions', newNested);
-                                        }} className="text-[10px] font-bold text-gray-400 hover:text-primary-600 uppercase tracking-tighter">+ Add Sub-option</button>
+                                        <button
+                                            onClick={() => {
+                                                const newNested = [...question.nestedOptions];
+                                                newNested[catIdx].items = [...(newNested[catIdx].items || []), { label: `Item ${(newNested[catIdx].items?.length || 0) + 1}`, variants: [] }];
+                                                updateQuestion(id, 'nestedOptions', newNested);
+                                            }}
+                                            className="text-xs font-bold text-blue-500 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg"
+                                        >
+                                            + Add Item
+                                        </button>
                                     </div>
                                 </div>
                             ))}
                             <button onClick={() => {
-                                const newNested = [...(question.nestedOptions || []), { label: '', subOptions: [''] }];
+                                const newNested = [...(question.nestedOptions || []), { label: `Category ${(question.nestedOptions?.length || 0) + 1}`, items: [] }];
                                 updateQuestion(id, 'nestedOptions', newNested);
-                            }} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs font-bold text-gray-400 hover:border-primary-200 hover:text-primary-600 transition-all">
-                                + Add New Category
+                            }} className="w-full py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-gray-500 font-bold hover:bg-gray-100 hover:border-gray-300 transition-all">
+                                + Add Category
                             </button>
                         </div>
                     )}
@@ -301,8 +359,20 @@ export default function FormBuilder() {
     const [isUploading, setIsUploading] = useState(false);
     const [urlAvailable, setUrlAvailable] = useState(null);
     const [checkingUrl, setCheckingUrl] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
     const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+    useEffect(() => {
+        const handleMessage = (event) => {
+            if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+                const { tokens } = event.data;
+                setForm(f => ({ ...f, theme: { ...f.theme, googleTokens: tokens } }));
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -616,6 +686,12 @@ export default function FormBuilder() {
                             >
                                 <BarChart3 className="w-4 h-4 inline-block mr-2" /> Analytics
                             </button>
+                            <button
+                                onClick={() => setActiveTab('integrations')}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'integrations' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <Share2 className="w-4 h-4 inline-block mr-2" /> Integrations
+                            </button>
                         </nav>
                     </div>
 
@@ -670,18 +746,17 @@ export default function FormBuilder() {
                                                 <h4 className="font-bold text-gray-900 text-sm">Google Sheets Integration</h4>
                                             </div>
                                             <p className="text-xs text-gray-500 mb-3">
-                                                Paste a Google Apps Script Webhook URL to send responses directly to your sheet.
+                                                Direct integration allows creating and syncing responses to Google Sheets on the spot.
                                             </p>
-                                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-widest flex items-center gap-2">
-                                                <LinkIcon className="w-3 h-3" /> Webhook URL
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={form.theme?.googleSheetWebhookUrl || ''}
-                                                onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, googleSheetWebhookUrl: e.target.value } }))}
-                                                placeholder="https://script.google.com/macros/s/.../exec"
-                                                className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary-100 transition-colors"
-                                            />
+                                            <button
+                                                onClick={() => {
+                                                    setActiveTab('integrations');
+                                                    setShowThemeSettings(false);
+                                                }}
+                                                className="w-full py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                Configure Integration →
+                                            </button>
                                         </div>
 
                                         <div className="pt-4 border-t border-gray-100">

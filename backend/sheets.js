@@ -1,40 +1,121 @@
-export const submitToSheets = async (req, res) => {
-    try {
-        const { formId, answers, webhookUrl } = req.body;
+import { google } from 'googleapis';
+import { supabase } from './db.js';
 
-        if (!webhookUrl) {
-            console.warn('Webhook URL not provided by form, skipping sheets integration');
-            return res.json({ success: true, simulated: true, warning: 'webhookUrl not provided' });
+const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback'
+);
+
+export const getGoogleAuthUrl = (state) => {
+    const scopes = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file'
+    ];
+    return oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: scopes,
+        state: state, // e.g., formId
+        prompt: 'consent'
+    });
+};
+
+export const handleGoogleCallback = async (code) => {
+    const { tokens } = await oauth2Client.getToken(code);
+    return tokens;
+};
+
+const getAuthenticatedClient = async (tokens) => {
+    const client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback'
+    );
+    client.setCredentials(tokens);
+    return client;
+};
+
+export const createSheet = async (tokens, title) => {
+    const auth = await getAuthenticatedClient(tokens);
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    const resource = {
+        properties: { title }
+    };
+    const spreadsheet = await sheets.spreadsheets.create({
+        resource,
+        fields: 'spreadsheetId,spreadsheetUrl'
+    });
+    return spreadsheet.data;
+};
+
+export const appendToSheet = async (tokens, spreadsheetId, answers) => {
+    try {
+        const auth = await getAuthenticatedClient(tokens);
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // Get existing headers
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'A1:Z1',
+        });
+
+        let headers = response.data.values ? response.data.values[0] : [];
+        if (headers.length === 0) {
+            headers = ['Timestamp', ...Object.keys(answers)];
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: 'A1',
+                valueInputOption: 'RAW',
+                resource: { values: [headers] }
+            });
         }
 
-        console.log('Sending webhook to:', webhookUrl);
+        const row = headers.map(h => {
+            if (h === 'Timestamp') return new Date().toISOString();
+            return answers[h] || '';
+        });
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'A1',
+            valueInputOption: 'RAW',
+            resource: { values: [row] }
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error appending to Google Sheet:', error);
+        throw error;
+    }
+};
+
+export const submitToSheets = async (req, res) => {
+    try {
+        const { formId, answers, webhookUrl, googleSheetId, googleTokens } = req.body;
+
+        // NEW: Direct Sheets API integration
+        if (googleSheetId && googleTokens) {
+            await appendToSheet(googleTokens, googleSheetId, answers);
+            return res.json({ success: true, message: 'Response saved to Google Sheet' });
+        }
+
+        // Legacy: Webhook integration
+        if (!webhookUrl) {
+            console.warn('No sheet integration provided, skipping');
+            return res.json({ success: true, simulated: true });
+        }
+
         const response = await fetch(webhookUrl, {
             method: 'POST',
             body: JSON.stringify({ formId, answers }),
             headers: { 'Content-Type': 'application/json' }
         });
 
-        console.log('Webhook fetch completed with status:', response.status);
-
-        // Treat any 2xx status code as a success.
-        if (!response.ok) {
-            throw new Error(`Webhook responded with status: ${response.status}`);
-        }
-
-        const text = await response.text();
-        let result;
-        try {
-            // Try to parse JSON (Google Apps Script returns this natively)
-            result = JSON.parse(text);
-        } catch (e) {
-            // Unparseable (e.g. Zapier/webhook.site html), but response was OK, so consider it a success.
-            console.log('Webhook returned non-JSON text but was successful:', text.substring(0, 100));
-            result = { success: true, message: 'Webhook executed successfully but returned non-JSON data' };
-        }
-
-        return res.json(result);
+        if (!response.ok) throw new Error(`Webhook failed: ${response.status}`);
+        return res.json({ success: true });
     } catch (error) {
-        console.error('Error submitting to Google Sheets:', error);
-        res.status(500).json({ error: 'Failed to submit form responses via webhook' });
+        console.error('Sheets integration error:', error);
+        res.status(500).json({ error: 'Failed to submit to Google Sheets' });
     }
 };

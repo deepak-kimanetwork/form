@@ -12,6 +12,7 @@ export default function PublicForm() {
     const [history, setHistory] = useState([0]); // Stack of visited indices
     const [answers, setAnswers] = useState({});
     const [activeCategory, setActiveCategory] = useState(null);
+    const [activeItem, setActiveItem] = useState(null);
     const [direction, setDirection] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const submittingRef = useRef(false);
@@ -73,8 +74,9 @@ export default function PublicForm() {
         if (!currentQ) return;
         const currentAnswer = answers[currentQ.label];
 
-        // Reset active category for nested choices
+        // Reset active category/item for nested choices
         setActiveCategory(null);
+        setActiveItem(null);
 
         // Validation 
         if (currentQ.required) {
@@ -224,7 +226,9 @@ export default function PublicForm() {
                 body: JSON.stringify({
                     formId: form.id,
                     answers,
-                    webhookUrl: form.theme?.googleSheetWebhookUrl
+                    webhookUrl: form.theme?.googleSheetWebhookUrl,
+                    googleSheetId: form.theme?.googleSheetId,
+                    googleTokens: form.theme?.googleTokens
                 })
             });
 
@@ -446,48 +450,98 @@ export default function PublicForm() {
                                     ) : currentQ?.type === 'nested-choice' ? (
                                         <div className="space-y-4">
                                             {(currentQ.nestedOptions || []).map((cat, i) => {
-                                                const isOpen = activeCategory === i;
-                                                const selectedSub = answers[currentQ.label]?.startsWith(`${cat.label}: `)
-                                                    ? answers[currentQ.label].replace(`${cat.label}: `, '')
-                                                    : null;
+                                                const isCatOpen = activeCategory === i;
+                                                const catAnswers = answers[currentQ.label] || '';
+                                                const hasSelectionInCat = catAnswers.startsWith(`${cat.label}: `);
 
                                                 return (
-                                                    <div key={i} className={`rounded-2xl border-2 transition-all overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'} ${isOpen ? 'bg-white/5 border-primary-500/50' : 'hover:border-primary-500/30'}`}>
+                                                    <div key={i} className={`rounded-3xl border-2 transition-all overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'} ${isCatOpen ? 'bg-white/5 border-primary-500/50' : 'hover:border-primary-500/30'}`}>
                                                         <button
-                                                            onClick={() => setActiveCategory(isOpen ? null : i)}
-                                                            className="w-full p-5 flex items-center justify-between text-left group"
+                                                            onClick={() => {
+                                                                setActiveCategory(isCatOpen ? null : i);
+                                                                setActiveItem(null);
+                                                            }}
+                                                            className="w-full p-6 flex items-center justify-between text-left group"
                                                         >
-                                                            <span className="text-xl font-bold opacity-80 group-hover:opacity-100 transition-opacity">{cat.label}</span>
-                                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isOpen ? 'border-primary-500 bg-primary-500 text-white rotate-180' : 'border-gray-400 opacity-50'}`}>
-                                                                <div className={`w-2 h-2 border-b-2 border-r-2 rotate-45 transform -translate-y-0.5`} />
+                                                            <div className="flex items-center gap-4">
+                                                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${isCatOpen ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-primary-50 group-hover:text-primary-500'}`}>{i + 1}</div>
+                                                                <span className="text-2xl font-black opacity-80 group-hover:opacity-100 transition-opacity">{cat.label}</span>
+                                                            </div>
+                                                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isCatOpen ? 'border-primary-500 bg-primary-500 text-white rotate-180' : 'border-gray-400 opacity-50'}`}>
+                                                                <div className={`w-2.5 h-2.5 border-b-2 border-r-2 rotate-45 transform -translate-y-0.5`} />
                                                             </div>
                                                         </button>
 
                                                         <AnimatePresence>
-                                                            {isOpen && (
+                                                            {isCatOpen && (
                                                                 <motion.div
                                                                     initial={{ height: 0, opacity: 0 }}
                                                                     animate={{ height: 'auto', opacity: 1 }}
                                                                     exit={{ height: 0, opacity: 0 }}
-                                                                    className="px-5 pb-5 space-y-2"
+                                                                    className="px-6 pb-6 space-y-4"
                                                                 >
-                                                                    {(cat.subOptions || []).map((sub, j) => (
-                                                                        <button
-                                                                            key={j}
-                                                                            onClick={() => {
-                                                                                setAnswers(a => ({ ...a, [currentQ.label]: `${cat.label}: ${sub}` }));
-                                                                                setTimeout(handleNext, 400);
-                                                                            }}
-                                                                            className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all ${selectedSub === sub ? 'bg-primary-500/20 text-primary-500 font-bold' : 'hover:bg-white/5 opacity-60 hover:opacity-100'}`}
-                                                                        >
-                                                                            <span>{sub}</span>
-                                                                            {selectedSub === sub && (
-                                                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                                                                    <Check className="w-5 h-5" />
-                                                                                </motion.div>
-                                                                            )}
-                                                                        </button>
-                                                                    ))}
+                                                                    {(cat.items || []).map((item, j) => {
+                                                                        const isItemOpen = activeItem === j;
+                                                                        const itemPrefix = `${cat.label}: ${item.label}`;
+                                                                        const currentSelection = catAnswers.startsWith(itemPrefix) ? catAnswers : '';
+                                                                        const selectedVariants = currentSelection.match(/\((.*)\)/)?.[1]?.split(', ') || [];
+
+                                                                        return (
+                                                                            <div key={j} className={`rounded-2xl border-2 transition-all ${isItemOpen ? 'border-blue-500/30 bg-blue-500/5' : 'border-gray-100'}`}>
+                                                                                <button
+                                                                                    onClick={() => setActiveItem(isItemOpen ? null : j)}
+                                                                                    className="w-full p-4 flex items-center justify-between text-left group"
+                                                                                >
+                                                                                    <span className="font-bold text-lg text-gray-700 group-hover:text-blue-600 transition-colors">{item.label}</span>
+                                                                                    <Plus className={`w-5 h-5 transition-transform ${isItemOpen ? 'rotate-45 text-blue-500' : 'text-gray-400'}`} />
+                                                                                </button>
+
+                                                                                <AnimatePresence>
+                                                                                    {isItemOpen && (
+                                                                                        <motion.div
+                                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                                            className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-2"
+                                                                                        >
+                                                                                            {(item.variants || []).map((v, k) => {
+                                                                                                const isSelected = selectedVariants.includes(v);
+                                                                                                return (
+                                                                                                    <button
+                                                                                                        key={k}
+                                                                                                        onClick={() => {
+                                                                                                            let newVariants;
+                                                                                                            if (currentQ.allowMultiple) {
+                                                                                                                newVariants = isSelected
+                                                                                                                    ? selectedVariants.filter(x => x !== v)
+                                                                                                                    : [...selectedVariants, v];
+                                                                                                            } else {
+                                                                                                                newVariants = [v];
+                                                                                                            }
+
+                                                                                                            const ansString = newVariants.length > 0
+                                                                                                                ? `${itemPrefix} (${newVariants.join(', ')})`
+                                                                                                                : '';
+
+                                                                                                            setAnswers(a => ({ ...a, [currentQ.label]: ansString }));
+
+                                                                                                            if (!currentQ.allowMultiple && newVariants.length > 0) {
+                                                                                                                setTimeout(handleNext, 400);
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className={`p-3 rounded-xl flex items-center justify-between text-left transition-all ${isSelected ? 'bg-primary-500 text-white font-bold shadow-lg shadow-primary-500/20' : 'bg-white border-2 border-gray-100 hover:border-primary-500/30'}`}
+                                                                                                    >
+                                                                                                        <span className="text-sm">{v}</span>
+                                                                                                        {isSelected && <Check className="w-4 h-4" />}
+                                                                                                    </button>
+                                                                                                );
+                                                                                            })}
+                                                                                        </motion.div>
+                                                                                    )}
+                                                                                </AnimatePresence>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </motion.div>
                                                             )}
                                                         </AnimatePresence>

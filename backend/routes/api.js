@@ -1,5 +1,15 @@
-import { generateForm, generateNextQuestion, generateResponseSummary, generateMoreQuestions } from '../ai.js';
-import { submitToSheets } from '../sheets.js';
+import {
+    generateForm,
+    generateNextQuestion,
+    generateResponseSummary,
+    generateMoreQuestions
+} from '../ai.js';
+import {
+    submitToSheets,
+    getGoogleAuthUrl,
+    handleGoogleCallback,
+    createSheet
+} from '../sheets.js';
 import { supabase } from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 
@@ -9,6 +19,42 @@ router.post('/generate', generateForm);
 router.post('/generate-next', generateNextQuestion);
 router.post('/generate-more', generateMoreQuestions);
 router.post('/summary', generateResponseSummary);
+
+// Google OAuth Routes
+router.get('/auth/google', (req, res) => {
+    const { formId } = req.query;
+    const url = getGoogleAuthUrl(formId);
+    res.redirect(url);
+});
+
+router.get('/auth/google/callback', async (req, res) => {
+    try {
+        const { code, state: formId } = req.query;
+        const tokens = await handleGoogleCallback(code);
+
+        // Return tokens to the frontend via a script that posts a message to the opener
+        // or just redirect back with a success flag
+        res.send(`
+            <script>
+                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', tokens: ${JSON.stringify(tokens)}, formId: '${formId}' }, "*");
+                window.close();
+            </script>
+        `);
+    } catch (error) {
+        console.error('Google Auth Error:', error);
+        res.status(500).send('Authentication failed');
+    }
+});
+
+router.post('/create-sheet', async (req, res) => {
+    try {
+        const { tokens, title } = req.body;
+        const sheet = await createSheet(tokens, title);
+        res.json(sheet);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 router.post('/submit', async (req, res) => {
     try {
         const { formId, answers, webhookUrl } = req.body;
