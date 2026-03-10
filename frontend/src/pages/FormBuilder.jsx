@@ -1082,9 +1082,9 @@ export default function FormBuilder() {
                         </div>
 
                         {/* Live Preview Sidebar */}
-                        <div className="hidden lg:block w-80 sticky top-28 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden h-[600px] flex flex-col">
-                            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Live Preview</span>
+                        <div className={`hidden lg:block w-80 sticky top-28 border rounded-2xl shadow-sm overflow-hidden h-[600px] flex flex-col transition-colors duration-300 ${form.theme?.mode === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
+                            <div className={`p-4 border-b flex items-center justify-between ${form.theme?.mode === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
+                                <span className={`text-xs font-bold uppercase tracking-widest ${form.theme?.mode === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>LIVE PREVIEW</span>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setDevicePreview('mobile')}
@@ -1126,7 +1126,7 @@ export default function FormBuilder() {
                                         <div className="space-y-6 mt-6 w-full text-left">
                                             {form.questions.map((q, idx) => (
                                                 <div key={q.id} className="w-full">
-                                                    <label className="block text-sm font-semibold mb-2" style={{ color: form.theme?.textColor || '#374151', fontFamily: form.theme?.fontFamily || 'Inter' }}>
+                                                    <label className="block text-sm font-semibold mb-2" style={{ color: form.theme?.mode === 'dark' ? '#e5e7eb' : (form.theme?.textColor || '#374151'), fontFamily: form.theme?.fontFamily || 'Inter' }}>
                                                         {idx + 1}. {q.label || 'Untitled Question'}
                                                         {q.required && <span className="text-red-500 ml-1">*</span>}
                                                     </label>
@@ -1181,7 +1181,7 @@ export default function FormBuilder() {
                                                                                 setPreviewAnswers(prev => ({ ...prev, [q.id]: next.join(', ') }));
                                                                             }
                                                                         }}
-                                                                        className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${isChecked ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-primary-200'}`}
+                                                                        className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${isChecked ? 'border-primary-500 bg-primary-50/80' : (form.theme?.mode === 'dark' ? 'border-white/10 bg-white/5 hover:border-primary-300' : 'border-gray-200 bg-white hover:border-primary-200')}`}
                                                                     >
                                                                         <input
                                                                             readOnly
@@ -1226,7 +1226,7 @@ export default function FormBuilder() {
                                                                 <button
                                                                     key={star}
                                                                     onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: star }))}
-                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${previewAnswers[q.id] === star ? 'bg-primary-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${previewAnswers[q.id] === star ? 'bg-primary-600 text-white shadow-lg' : (form.theme?.mode === 'dark' ? 'bg-white/10 text-white/70 hover:bg-white/20' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')}`}
                                                                 >
                                                                     {star}
                                                                 </button>
@@ -1238,7 +1238,7 @@ export default function FormBuilder() {
                                                                 <button
                                                                     key={opt}
                                                                     onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                                                                    className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${previewAnswers[q.id] === opt ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-100 bg-white hover:border-primary-200'}`}
+                                                                    className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${previewAnswers[q.id] === opt ? 'border-primary-500 bg-primary-50/80 text-primary-700' : (form.theme?.mode === 'dark' ? 'border-white/10 bg-white/5 text-white/80 hover:border-primary-300' : 'border-gray-100 bg-white hover:border-primary-200')}`}
                                                                 >
                                                                     {opt}
                                                                 </button>
@@ -1251,7 +1251,7 @@ export default function FormBuilder() {
                                                                     <button
                                                                         key={val}
                                                                         onClick={() => setPreviewAnswers(prev => ({ ...prev, [q.id]: val }))}
-                                                                        className={`flex-1 aspect-square sm:aspect-auto sm:h-12 rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold border-2 transition-all ${previewAnswers[q.id] === val ? 'bg-primary-600 border-primary-600 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-primary-200'}`}
+                                                                        className={`flex-1 aspect-square sm:aspect-auto sm:h-12 rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold border-2 transition-all ${previewAnswers[q.id] === val ? 'bg-primary-600 border-primary-600 text-white shadow-lg' : (form.theme?.mode === 'dark' ? 'bg-white/5 border-white/10 text-white/60 hover:border-primary-300' : 'bg-white border-gray-100 text-gray-500 hover:border-primary-200')}`}
                                                                     >
                                                                         {val}
                                                                     </button>
@@ -1263,7 +1263,7 @@ export default function FormBuilder() {
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500 italic">
+                                                        <div className={`w-full p-2.5 rounded-lg border text-sm italic ${form.theme?.mode === 'dark' ? 'border-white/10 bg-white/5 text-white/40' : 'border-gray-200 bg-gray-100 text-gray-500'}`}>
                                                             Interactive preview for {q.type}
                                                         </div>
                                                     )}
