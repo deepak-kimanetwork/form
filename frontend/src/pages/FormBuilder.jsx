@@ -181,8 +181,8 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                         <button onClick={() => {
                                             const newNested = question.nestedOptions.filter((_, i) => i !== catIdx);
                                             updateQuestion(id, 'nestedOptions', newNested);
-                                        }} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                                            &times;
+                                        }} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Remove Category">
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
 
@@ -218,7 +218,9 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                                         const newNested = [...question.nestedOptions];
                                                         newNested[catIdx].items = newNested[catIdx].items.filter((_, i) => i !== itemIdx);
                                                         updateQuestion(id, 'nestedOptions', newNested);
-                                                    }} className="text-gray-400 hover:text-red-500">&times;</button>
+                                                    }} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Remove Item">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
 
                                                 <div className="pl-4 space-y-2">
@@ -262,7 +264,9 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                                                                 const newNested = [...question.nestedOptions];
                                                                 newNested[catIdx].items[itemIdx].variants = newNested[catIdx].items[itemIdx].variants.filter((_, i) => i !== vIdx);
                                                                 updateQuestion(id, 'nestedOptions', newNested);
-                                                            }} className="text-gray-300 hover:text-red-400 p-1 shrink-0">&times;</button>
+                                                            }} className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-md transition-all shrink-0" title="Remove Variant">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
                                                         </div>
                                                     ))}
                                                     <button
