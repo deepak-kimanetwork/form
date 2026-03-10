@@ -10,7 +10,8 @@ const oauth2Client = new google.auth.OAuth2(
 export const getGoogleAuthUrl = (state) => {
     const scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file'
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.metadata.readonly'
     ];
     return oauth2Client.generateAuthUrl({
         access_type: 'offline',
