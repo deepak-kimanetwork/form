@@ -9,7 +9,8 @@ import {
     submitToSheets,
     getGoogleAuthUrl,
     handleGoogleCallback,
-    createSheet
+    createSheet,
+    listSheets
 } from '../sheets.js';
 import { supabase } from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -66,6 +67,19 @@ router.post('/create-sheet', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+router.post('/list-sheets', async (req, res) => {
+    try {
+        const { tokens } = req.body;
+        if (!tokens) return res.status(400).json({ error: 'Tokens required' });
+        const sheets = await listSheets(tokens);
+        res.json(sheets);
+    } catch (error) {
+        console.error('Error listing sheets:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/submit', async (req, res) => {
     try {
         const { formId, answers, webhookUrl } = req.body;

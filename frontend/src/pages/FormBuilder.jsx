@@ -8,7 +8,7 @@ import {
     ArrowLeft, GripVertical, Plus, Trash2, Save, Play,
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
-    Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle,
+    Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle, Search,
     Database, Sparkles, Info, FileText, ExternalLink
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
@@ -424,6 +424,9 @@ export default function FormBuilder() {
     const [isGeneratingAi, setIsGeneratingAi] = useState(false);
     const [previewAnswers, setPreviewAnswers] = useState({});
     const [previewExpandedCat, setPreviewExpandedCat] = useState(null);
+    const [availableSheets, setAvailableSheets] = useState([]);
+    const [loadingSheets, setLoadingSheets] = useState(false);
+    const [showSheetPicker, setShowSheetPicker] = useState(false);
 
     useEffect(() => {
         const handleMessage = (event) => {
@@ -435,6 +438,52 @@ export default function FormBuilder() {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, []);
+
+    const fetchAvailableSheets = async () => {
+        if (!form.theme?.googleTokens) return;
+        setLoadingSheets(true);
+        try {
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+            const res = await fetch(`${apiUrl}/api/list-sheets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tokens: form.theme.googleTokens })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setAvailableSheets(data || []);
+            setShowSheetPicker(true);
+        } catch (error) {
+            console.error('Error fetching sheets:', error);
+            alert('Failed to load sheets: ' + error.message);
+        } finally {
+            setLoadingSheets(false);
+        }
+    };
+
+    const handleCreateSheet = async () => {
+        if (!form.theme?.googleTokens) return;
+        setLoadingSheets(true);
+        try {
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+            const res = await fetch(`${apiUrl}/api/create-sheet`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tokens: form.theme.googleTokens, title: form.title || 'Untitled Form' })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setForm(f => ({ ...f, theme: { ...f.theme, googleSheetId: data.spreadsheetId } }));
+            alert('Successfully created and linked new sheet!');
+        } catch (error) {
+            console.error('Error creating sheet:', error);
+            alert('Failed to create sheet: ' + error.message);
+        } finally {
+            setLoadingSheets(false);
+        }
+    };
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -1310,7 +1359,7 @@ export default function FormBuilder() {
                                 <h3 className="text-3xl font-black text-gray-900 mb-4">Google Sheets</h3>
                                 <p className="text-gray-500 mb-10 leading-relaxed text-lg text-left">Automatically send every response to a Google Sheet. Create new sheets or pick existing ones directly.</p>
 
-                                {!form.theme?.googleTokens ? (
+                                {!(form.theme?.googleTokens) ? (
                                     <button
                                         onClick={() => {
                                             const width = 600, height = 700;
@@ -1326,71 +1375,113 @@ export default function FormBuilder() {
                                     </button>
                                 ) : (
                                     <div className="space-y-6">
-                                        <div className="flex items-center gap-4 p-5 bg-green-50 text-green-700 rounded-2xl border-2 border-green-100">
-                                            <div className="w-4 h-4 rounded-full bg-green-500 animate-pulse"></div>
-                                            <span className="font-bold flex-1 text-lg">Account Connected</span>
-                                            <button onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, googleTokens: null, googleSheetId: null } }))} className="text-xs font-black uppercase tracking-widest opacity-70 hover:opacity-100 p-2 bg-white/50 rounded-lg">Disconnect</button>
+                                        <div className="bg-green-50 border-2 border-green-200 p-6 rounded-3xl flex items-center gap-4 shadow-sm">
+                                            <div className="w-12 h-12 bg-green-600 text-white rounded-full flex items-center justify-center">
+                                                <CheckCircle2 className="w-6 h-6" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="font-bold text-green-900">Google Account Connected</p>
+                                                <p className="text-sm text-green-700">You can now link form to a sheet.</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, googleTokens: null, googleSheetId: null } }))}
+                                                className="ml-auto text-xs font-bold text-red-600 hover:text-red-700"
+                                            >
+                                                Disconnect
+                                            </button>
                                         </div>
 
                                         {!form.theme?.googleSheetId ? (
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-                                                        const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
-                                                        const res = await fetch(`${apiUrl}/api/create-sheet`, {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ tokens: form.theme.googleTokens, title: `Responses: ${form.title}` })
-                                                        });
-                                                        const data = await res.json();
-                                                        if (data.spreadsheetId) {
-                                                            setForm(f => ({ ...f, theme: { ...f.theme, googleSheetId: data.spreadsheetId, googleSheetUrl: data.spreadsheetUrl } }));
-                                                        }
-                                                    } catch (err) {
-                                                        alert('Failed to create sheet');
-                                                    }
-                                                }}
-                                                className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all flex items-center justify-center gap-4 shadow-xl shadow-gray-200"
-                                            >
-                                                <Plus className="w-6 h-6" /> Create New Sheet
-                                            </button>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <a
-                                                    href={form.theme.googleSheetUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="w-full p-6 border-2 border-gray-100 rounded-3xl flex items-center gap-4 hover:border-green-300 hover:bg-green-50 transition-all group"
-                                                >
-                                                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
-                                                        <FileText className="w-6 h-6" />
-                                                    </div>
-                                                    <div className="flex-1 overflow-hidden text-left">
-                                                        <p className="font-black text-gray-900 text-lg truncate">Linked Spreadsheet</p>
-                                                        <p className="text-sm font-bold text-gray-400 truncate tracking-tight">{form.theme.googleSheetId}</p>
-                                                    </div>
-                                                    <ExternalLink className="w-5 h-5 text-gray-300 group-hover:text-green-600" />
-                                                </a>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <button
-                                                    onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, googleSheetId: null, googleSheetUrl: null } }))}
-                                                    className="w-full py-3 text-sm font-black text-red-400 hover:text-red-600 transition-colors uppercase tracking-widest"
+                                                    onClick={handleCreateSheet}
+                                                    disabled={loadingSheets}
+                                                    className="p-6 bg-white border-2 border-gray-100 rounded-3xl hover:border-green-500 hover:shadow-xl transition-all group text-left"
                                                 >
-                                                    Unlink Sheet
+                                                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-50 transition-colors">
+                                                        <Plus className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                                                    </div>
+                                                    <h4 className="font-bold text-gray-900 mb-1">Create New Sheet</h4>
+                                                    <p className="text-xs text-gray-500">Create a fresh sheet for this form's data</p>
                                                 </button>
+
+                                                <button
+                                                    onClick={fetchAvailableSheets}
+                                                    disabled={loadingSheets}
+                                                    className="p-6 bg-white border-2 border-gray-100 rounded-3xl hover:border-green-500 hover:shadow-xl transition-all group text-left"
+                                                >
+                                                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-50 transition-colors">
+                                                        <Search className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                                                    </div>
+                                                    <h4 className="font-bold text-gray-900 mb-1">Link Existing</h4>
+                                                    <p className="text-xs text-gray-500">Pick a spreadsheet from your Google Drive</p>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white border-2 border-gray-100 p-6 rounded-3xl shadow-sm text-left">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                                        <FileText className="w-4 h-4 text-green-600" />
+                                                    </div>
+                                                    <span className="font-bold text-gray-900">Linked Spreadsheet</span>
+                                                </div>
+                                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs font-mono text-gray-600 break-all mb-4">
+                                                    {form.theme.googleSheetId}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${form.theme.googleSheetId}`, '_blank')}
+                                                        className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all"
+                                                    >
+                                                        Open Sheet
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setForm(f => ({ ...f, theme: { ...f.theme, googleSheetId: null } }))}
+                                                        className="px-4 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all"
+                                                    >
+                                                        Change
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {showSheetPicker && (
+                                            <div className="bg-white border-2 border-gray-100 p-6 rounded-3xl shadow-sm text-left">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h4 className="font-bold text-gray-900">Choose a Spreadsheet</h4>
+                                                    <button onClick={() => setShowSheetPicker(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                                                </div>
+                                                <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                                    {availableSheets.map(sheet => (
+                                                        <button
+                                                            key={sheet.id}
+                                                            onClick={() => {
+                                                                setForm(f => ({ ...f, theme: { ...f.theme, googleSheetId: sheet.id } }));
+                                                                setShowSheetPicker(false);
+                                                            }}
+                                                            className="w-full p-3 rounded-xl border border-gray-100 hover:border-green-500 hover:bg-green-50 transition-all text-left group"
+                                                        >
+                                                            <div className="font-bold text-sm text-gray-900 group-hover:text-green-900">{sheet.name}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono">{sheet.id}</div>
+                                                        </button>
+                                                    ))}
+                                                    {availableSheets.length === 0 && (
+                                                        <div className="py-8 text-center text-sm text-gray-400 italic">No spreadsheets found.</div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 )}
                             </div>
+                        </div>
 
-                            <div className="bg-gray-50 border-4 border-dashed border-gray-100 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center opacity-60 hover:opacity-100 transition-opacity">
-                                <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-8">
-                                    <Share2 className="w-10 h-10 text-gray-300" />
-                                </div>
-                                <h3 className="text-2xl font-black text-gray-300 mb-4 uppercase tracking-wider">More coming</h3>
-                                <p className="text-lg font-bold text-gray-300">Zapier, HubSpot, and Webhooks are being developed.</p>
+                        <div className="bg-gray-50 border-4 border-dashed border-gray-100 rounded-[2rem] p-10 flex flex-col items-center justify-center text-center opacity-60 hover:opacity-100 transition-opacity">
+                            <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-8">
+                                <Share2 className="w-10 h-10 text-gray-300" />
                             </div>
+                            <h3 className="text-2xl font-black text-gray-300 mb-4 uppercase tracking-wider">More coming</h3>
+                            <p className="text-lg font-bold text-gray-300">Zapier, HubSpot, and Webhooks are being developed.</p>
                         </div>
                     </div>
                 )}
@@ -1399,3 +1490,4 @@ export default function FormBuilder() {
     );
 }
 
+export default FormBuilder;

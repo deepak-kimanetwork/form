@@ -35,6 +35,17 @@ const getAuthenticatedClient = async (tokens) => {
     return client;
 };
 
+export const listSheets = async (tokens) => {
+    const auth = await getAuthenticatedClient(tokens);
+    const drive = google.drive({ version: 'v3', auth });
+    const response = await drive.files.list({
+        pageSize: 20,
+        fields: 'files(id, name)',
+        q: "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+    });
+    return response.data.files;
+};
+
 export const createSheet = async (tokens, title) => {
     const auth = await getAuthenticatedClient(tokens);
     const sheets = google.sheets({ version: 'v4', auth });
