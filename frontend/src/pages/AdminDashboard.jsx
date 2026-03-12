@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getForms, getResponsesLocal, deleteForm } from '../utils/storage';
-import { PlusCircle, Edit, Trash2, Link as LinkIcon, FileText, LogOut, User } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Link as LinkIcon, FileText, LogOut, User, Book, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 

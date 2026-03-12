@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFormById, saveResponseLocal } from '../utils/storage';
-import { Check, ArrowRight, ArrowLeft, Loader2, Star, UploadCloud, FileText, X } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Loader2, Star, UploadCloud, FileText, X, XCircle, Settings, Sparkles, Plus } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
 const escapeRegExp = (string) => {

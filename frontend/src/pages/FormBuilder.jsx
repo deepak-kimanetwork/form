@@ -9,7 +9,7 @@ import {
     GitMerge, Settings, Download, Layout, BarChart3,
     Image as ImageIcon, Type, Palette, Smartphone, Laptop,
     Share2, Copy, Loader2, Link as LinkIcon, CheckCircle2, XCircle, Search,
-    Database, Sparkles, Info, FileText, ExternalLink
+    Database, Sparkles, Info, FileText, ExternalLink, Clock, Mail, Users
 } from 'lucide-react';
 import AnalyticsView from '../components/AnalyticsView';
 import WorkflowEditor from '../components/WorkflowEditor';
