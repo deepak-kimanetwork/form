@@ -203,3 +203,38 @@ Strict raw JSON array only.`;
     res.status(500).json({ error: `Failed to generate questions: ${error.message}` });
   }
 };
+
+export const translateForm = async (req, res) => {
+  try {
+    const { questions, title, targetLanguage } = req.body;
+    if (!questions || !targetLanguage) return res.status(400).json({ error: 'Questions and targetLanguage are required' });
+
+    const translated = await callWithRetry(async (client, modelName) => {
+      const model = client.getGenerativeModel({ model: modelName });
+      const systemPrompt = `You are a translation expert. Translate the following form content into ${targetLanguage}.
+You must return a JSON object with the exact same structure as the input, but with all labels, titles, descriptions, and options translated.
+Input Structure:
+{
+  "title": "...",
+  "questions": [
+    {
+      "label": "...",
+      "options": ["...", "..."],
+      "nestedOptions": [{"label": "...", "subOptions": ["...", "..."]}]
+    }
+  ]
+}
+Maintain all IDs and technical tags (like [Category]).
+Strict raw JSON only. Do not add any text outside the JSON.`;
+
+      const result = await model.generateContent(`${systemPrompt}\n\nContent to translate:\n${JSON.stringify({ title, questions })}`);
+      const response = await result.response;
+      return extractJson(response.text());
+    });
+
+    return res.json(translated);
+  } catch (error) {
+    console.error('Error translating form:', error);
+    res.status(500).json({ error: `Failed to translate form: ${error.message}` });
+  }
+};

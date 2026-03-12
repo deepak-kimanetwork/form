@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFormById, saveResponseLocal } from '../utils/storage';
-import { Check, ArrowRight, ArrowLeft, Loader2, Star } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, Loader2, Star, UploadCloud, FileText, X } from 'lucide-react';
+import { supabase } from '../utils/supabase';
 
 const escapeRegExp = (string) => {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
@@ -23,12 +24,58 @@ export default function PublicForm() {
     const [isDone, setIsDone] = useState(false);
     const [summary, setSummary] = useState(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
+    const [isPasswordCorrect, setIsPasswordCorrect] = useState(false);
+    const [enteredPassword, setEnteredPassword] = useState('');
+    const [score, setScore] = useState(0);
+    const [isClosed, setIsClosed] = useState(false);
+    const [closeReason, setCloseReason] = useState('');
 
     useEffect(() => {
         const fetchForm = async () => {
             const f = await getFormById(formId);
             if (f) {
                 setForm(f);
+                // Hidden Fields: auto-fill from URL params
+                const params = new URLSearchParams(window.location.search);
+                const hiddenAnswers = {};
+                f.questions.forEach(q => {
+                    const val = params.get(q.label) || params.get(q.id);
+                    if (val) hiddenAnswers[q.label] = val;
+                });
+                setAnswers(prev => ({ ...prev, ...hiddenAnswers }));
+                
+                if (!f.theme?.password) {
+                    setIsPasswordCorrect(true);
+                }
+
+                // Check Deadline & Limits
+                if (f.theme?.deadline && new Date() > new Date(f.theme.deadline)) {
+                    setIsClosed(true);
+                    setCloseReason('This form has reached its deadline and is no longer accepting submissions.');
+                }
+
+                if (f.theme?.maxResponses) {
+                    const { count, error } = await supabase
+                        .from('responses')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('form_id', formId);
+                    
+                    if (!error && count >= parseInt(f.theme.maxResponses)) {
+                        setIsClosed(true);
+                        setCloseReason('This form has reached its maximum response limit.');
+                    }
+                }
+
+                // Partial Saving: Load from localStorage
+                const saved = localStorage.getItem(`draft_${formId}`);
+                if (saved) {
+                    if (confirm('Find your previous progress. Would you like to continue from where you left off?')) {
+                        const { answers: savedAnswers, index: savedIndex } = JSON.parse(saved);
+                        setAnswers(savedAnswers);
+                        setCurrentIndex(savedIndex);
+                        setHistory(Array.from({length: savedIndex + 1}, (_, i) => i));
+                    }
+                }
             } else {
                 alert('Form not found');
                 navigate('/');
@@ -36,6 +83,36 @@ export default function PublicForm() {
         };
         fetchForm();
     }, [formId, navigate]);
+
+    const handleLanguageChange = async (lang) => {
+        if (!lang) return;
+        setIsAiLoading(true);
+        try {
+            const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+            
+            const res = await fetch(`${apiUrl}/api/translate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    questions: form.questions,
+                    title: form.title,
+                    targetLanguage: lang
+                })
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setForm({ ...form, title: data.title, questions: data.questions });
+            } else {
+                alert('Translation failed.');
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -112,6 +189,20 @@ export default function PublicForm() {
                 } else if (currentAnswer === 'Other') {
                     setAnswers(a => ({ ...a, [currentQ.label]: otherVal }));
                 }
+            }
+        }
+
+        if (currentIndex === form.questions.length - 1) {
+            // End of form: check Quiz Mode
+            if (form.theme?.isQuizMode) {
+                let currentScore = 0;
+                form.questions.forEach(q => {
+                    const ans = answers[q.label];
+                    if (ans && q.correctAnswer && String(ans).toLowerCase().trim() === String(q.correctAnswer).toLowerCase().trim()) {
+                        currentScore++;
+                    }
+                });
+                setScore(currentScore);
             }
         }
 
@@ -224,17 +315,23 @@ export default function PublicForm() {
             const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
             const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
 
-            await fetch(`${apiUrl}/api/submit`, {
+            const res = await fetch(`${apiUrl}/api/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     formId: form.id,
                     answers,
+                    quizScore: form.theme?.isQuizMode ? score : null,
                     webhookUrl: form.theme?.googleSheetWebhookUrl,
                     googleSheetId: form.theme?.googleSheetId,
                     googleTokens: form.theme?.googleTokens
                 })
             });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to submit form.');
+            }
 
             const summaryRes = await fetch(`${apiUrl}/api/summary`, {
                 method: 'POST',
@@ -295,8 +392,34 @@ export default function PublicForm() {
                     <img src={theme.backgroundImageUrl} className="w-full h-full object-cover" alt="" />
                 </div>
             )}
+            
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+                <select 
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className={`p-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-sm font-bold outline-none cursor-pointer ${isDark ? 'text-white hover:bg-white/20' : 'text-gray-900 hover:bg-black/5'}`}
+                >
+                    <option value="" className="text-black">Translate...</option>
+                    {['English', 'Spanish', 'French', 'German', 'Hindi', 'Chinese', 'Arabic', 'Japanese'].map(lang => (
+                        <option key={lang} value={lang} className="text-black">{lang}</option>
+                    ))}
+                </select>
+                {isAiLoading && <div className="p-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20"><Loader2 className="w-4 h-4 animate-spin text-white" /></div>}
+            </div>
 
-            <div className="fixed top-0 left-0 w-full h-1 bg-black/5 z-50">
+            {isClosed ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-2xl mx-auto">
+                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mb-8">
+                        <XCircle className="w-12 h-12" />
+                    </div>
+                    <h1 className="text-4xl font-black mb-4">Form Closed</h1>
+                    <p className="text-xl text-gray-500 leading-relaxed">{closeReason}</p>
+                    <button onClick={() => navigate('/')} className="mt-12 px-8 py-3 bg-gray-900 text-white rounded-xl font-bold">
+                        Go Home
+                    </button>
+                </div>
+            ) : (
+                <>
+                <div className="fixed top-0 left-0 w-full h-1 bg-black/5 z-50">
                 <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
@@ -312,7 +435,58 @@ export default function PublicForm() {
                     </motion.div>
                 )}
 
-                <AnimatePresence custom={direction} mode="wait">
+                {!isPasswordCorrect ? (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md bg-white/5 p-8 rounded-3xl border border-white/10 backdrop-blur-xl text-center">
+                        <Settings className="w-12 h-12 mx-auto mb-6 text-primary-500" />
+                        <h2 className="text-2xl font-black mb-2">Protected Form</h2>
+                        <p className="text-gray-400 mb-8">This form requires a password to access.</p>
+                        <input 
+                            type="password"
+                            autoFocus
+                            placeholder="Enter password..."
+                            value={enteredPassword}
+                            onChange={(e) => setEnteredPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && enteredPassword === form.theme.password && setIsPasswordCorrect(true)}
+                            className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-primary-500 transition-all text-center mb-4"
+                        />
+                        <button 
+                            onClick={() => {
+                                if (enteredPassword === form.theme.password) {
+                                    setIsPasswordCorrect(true);
+                                } else {
+                                    alert('Incorrect password');
+                                }
+                            }}
+                            className="w-full py-4 bg-primary-600 rounded-2xl font-black hover:bg-primary-700 transition-all shadow-xl shadow-primary-500/20"
+                        >
+                            Unlock Form
+                        </button>
+                    </motion.div>
+                ) : isDone && form.theme?.isQuizMode ? (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full text-center space-y-8">
+                        <div className="relative inline-block">
+                            <motion.div 
+                                initial={{ scale: 0 }} 
+                                animate={{ scale: 1 }} 
+                                transition={{ type: 'spring', bounce: 0.5 }}
+                                className="w-48 h-48 rounded-full border-8 border-primary-500/20 flex flex-col items-center justify-center bg-white/5 backdrop-blur-3xl"
+                            >
+                                <p className="text-lg font-bold text-primary-500 uppercase tracking-widest">Your Score</p>
+                                <h3 className="text-7xl font-black">{score}</h3>
+                                <p className="text-sm font-bold text-gray-500">out of {form.questions.length}</p>
+                            </motion.div>
+                            <Sparkles className="absolute -top-4 -right-4 w-12 h-12 text-yellow-400 animate-pulse" />
+                        </div>
+                        <div className="space-y-4">
+                            <h2 className="text-4xl font-black">Quiz Completed!</h2>
+                            <p className="text-xl text-gray-400 max-w-md mx-auto">Great job! You've finished the quiz. Your results have been recorded.</p>
+                        </div>
+                        <button onClick={() => navigate('/')} className="px-10 py-4 bg-gray-900 text-white rounded-2xl font-black text-lg hover:scale-105 transition-all">
+                            Done
+                        </button>
+                    </motion.div>
+                ) : (
+                    <AnimatePresence custom={direction} mode="wait">
                     <motion.div
                         key={currentIndex}
                         custom={direction}
@@ -333,6 +507,16 @@ export default function PublicForm() {
                         <h2 className="text-3xl sm:text-4xl font-bold mb-8 leading-tight">
                             {currentQ?.label}
                         </h2>
+
+                        {currentQ?.imageUrl && (
+                            <div className="mb-8 w-full max-w-xl">
+                                <img 
+                                    src={currentQ.imageUrl} 
+                                    className="w-full rounded-2xl shadow-lg border border-gray-100 object-contain max-h-[400px]" 
+                                    alt="Question Visual" 
+                                />
+                            </div>
+                        )}
 
                         <div className="mb-8 w-full max-w-xl">
                             {isAiLoading ? (
@@ -361,6 +545,60 @@ export default function PublicForm() {
                                             className={`w-full h-40 text-xl font-medium bg-transparent border-b-2 border-opacity-20 outline-none pb-2 transition-colors resize-none placeholder:opacity-30 ${isDark ? 'border-white' : 'border-black'}`}
                                             style={{ borderColor: answers[currentQ.label] ? theme.primaryColor : undefined }}
                                         />
+                                    ) : currentQ?.type === 'file-upload' ? (
+                                        <div className="space-y-4">
+                                            {!answers[currentQ.label] ? (
+                                                <label className={`block w-full border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-gray-50/50 ${isDark ? 'border-white/10 hover:border-primary-500/50' : 'border-gray-200 hover:border-primary-500/50'}`}>
+                                                    <input 
+                                                        type="file" 
+                                                        className="hidden" 
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files[0];
+                                                            if (!file) return;
+                                                            
+                                                            setIsAiLoading(true); // Reuse loader for simplicity
+                                                            try {
+                                                                const fileExt = file.name.split('.').pop();
+                                                                const fileName = `resp_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+                                                                const filePath = `responses/${formId}/${fileName}`;
+                                                                
+                                                                const { error } = await supabase.storage
+                                                                    .from('logos') // Use existing bucket
+                                                                    .upload(filePath, file);
+                                                                
+                                                                if (error) throw error;
+                                                                
+                                                                const { data } = supabase.storage.from('logos').getPublicUrl(filePath);
+                                                                setAnswers(a => ({ ...a, [currentQ.label]: data.publicUrl }));
+                                                            } catch (err) {
+                                                                alert('Upload failed: ' + err.message);
+                                                            } finally {
+                                                                setIsAiLoading(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <UploadCloud className="w-10 h-10 mx-auto mb-4 text-gray-400" />
+                                                    <p className="text-lg font-medium">Click to upload or drag and drop</p>
+                                                    <p className="text-sm text-gray-400 mt-1">Any file up to 10MB</p>
+                                                </label>
+                                            ) : (
+                                                <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-primary-500 bg-primary-50/50">
+                                                    <div className="w-12 h-12 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600">
+                                                        <FileText />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold truncate">File Uploaded</p>
+                                                        <a href={answers[currentQ.label]} target="_blank" rel="noreferrer" className="text-xs text-primary-600 hover:underline">View Upload</a>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setAnswers(a => ({ ...a, [currentQ.label]: null }))}
+                                                        className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all"
+                                                    >
+                                                        <X className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (currentQ?.type === 'select' || currentQ?.type === 'multiple-choice') ? (
                                         <div className="space-y-3">
                                             {[...(currentQ.options || []), ...(currentQ.hasOther ? ['Other'] : [])].map((opt, i) => {
@@ -718,6 +956,7 @@ export default function PublicForm() {
                         </div>
                     </motion.div>
                 </AnimatePresence>
+                )}
             </div>
 
             <div className="fixed bottom-0 right-0 p-4 sm:p-8 flex gap-2 z-50">
@@ -728,6 +967,8 @@ export default function PublicForm() {
                     <ArrowRight className="w-5 h-5" />
                 </button>
             </div>
+            </>
+            )}
         </div>
     );
 }

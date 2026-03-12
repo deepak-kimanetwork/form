@@ -3,11 +3,12 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { Users, CheckCircle, Clock, TrendingUp, AlertCircle, Download } from 'lucide-react';
+import { Users, CheckCircle, Clock, TrendingUp, AlertCircle, Download, Sparkles } from 'lucide-react';
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export default function AnalyticsView({ formId, responses = [] }) {
+export default function AnalyticsView({ form, responses = [] }) {
+    const isQuiz = form?.theme?.isQuizMode;
     const stats = useMemo(() => {
         if (!responses.length) return { total: 0, completion: 0, avgTime: '0s' };
 
@@ -49,12 +50,14 @@ export default function AnalyticsView({ formId, responses = [] }) {
         // Get all unique question labels
         const headersSet = new Set(['Timestamp']);
         responses.forEach(r => Object.keys(r.answers).forEach(k => headersSet.add(k)));
+        if (isQuiz) headersSet.add('Score');
         const headers = Array.from(headersSet);
 
         // Build CSV rows
         const rows = responses.map(r => {
             const rowData = headers.map(header => {
                 if (header === 'Timestamp') return new Date(r.created_at || r.timestamp).toLocaleString();
+                if (header === 'Score') return r.quiz_score ?? '';
                 let val = r.answers[header] || '';
                 // Escape quotes and wrap in quotes if there's a comma
                 val = String(val).replace(/"/g, '""');
@@ -103,8 +106,8 @@ export default function AnalyticsView({ formId, responses = [] }) {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatCard title="Total Responses" value={stats.total} icon={<Users />} color="blue" />
                 <StatCard title="Completion Rate" value={`${stats.completion}%`} icon={<CheckCircle />} color="green" />
-                <StatCard title="Avg. Time to Complete" value={stats.avgTime} icon={<Clock />} color="yellow" />
-                <StatCard title="Total Leads" value={stats.total} icon={<TrendingUp />} color="purple" />
+                <StatCard title={isQuiz ? "Avg. Quiz Score" : "Avg. Time"} value={isQuiz ? `${(responses.reduce((acc, r) => acc + (r.quiz_score || 0), 0) / responses.length).toFixed(1)} / ${form.questions.length}` : stats.avgTime} icon={<Sparkles className="w-6 h-6" />} color="yellow" />
+                <StatCard title="Total Conversion" value={stats.total} icon={<TrendingUp />} color="purple" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -177,7 +180,8 @@ export default function AnalyticsView({ formId, responses = [] }) {
                             <tr>
                                 <th className="px-6 py-4 font-semibold">Time</th>
                                 <th className="px-6 py-4 font-semibold">Answers</th>
-                                <th className="px-6 py-4 font-semibold">Score</th>
+                                {isQuiz && <th className="px-6 py-4 font-semibold">Score</th>}
+                                <th className="px-6 py-4 font-semibold">Value</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -188,16 +192,21 @@ export default function AnalyticsView({ formId, responses = [] }) {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-wrap gap-2">
-                                            {Object.entries(res.answers).slice(0, 3).map(([key, val]) => (
-                                                <span key={key} className="inline-block px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 truncate max-w-[150px]">
-                                                    {key}: {String(val)}
+                                            {Object.entries(res.answers).slice(0, 5).map(([key, val]) => (
+                                                <span key={key} className="inline-block px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 truncate max-w-[200px]">
+                                                    <span className="font-bold">{key}:</span> {String(val).startsWith('http') ? (
+                                                        <a href={val} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">View File</a>
+                                                    ) : String(val)}
                                                 </span>
                                             ))}
-                                            {Object.keys(res.answers).length > 3 && (
-                                                <span className="text-xs text-gray-400">+{Object.keys(res.answers).length - 3} more</span>
-                                            )}
                                         </div>
                                     </td>
+                                    {isQuiz && (
+                                        <td className="px-6 py-4">
+                                            <span className="font-bold text-gray-900">{res.quiz_score || 0}</span>
+                                            <span className="text-gray-400 text-xs ml-1">/ {form.questions.length}</span>
+                                        </td>
+                                    )}
                                     <td className="px-6 py-4">
                                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             High

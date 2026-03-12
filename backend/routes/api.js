@@ -3,7 +3,8 @@ import {
     generateForm,
     generateNextQuestion,
     generateResponseSummary,
-    generateMoreQuestions
+    generateMoreQuestions,
+    translateForm
 } from '../ai.js';
 import {
     submitToSheets,
@@ -14,6 +15,8 @@ import {
 } from '../sheets.js';
 import { supabase } from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { sendNotificationEmail } from '../utils/mailer.js';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 
@@ -21,6 +24,7 @@ router.post('/generate', generateForm);
 router.post('/generate-next', generateNextQuestion);
 router.post('/generate-more', generateMoreQuestions);
 router.post('/summary', generateResponseSummary);
+router.post('/translate', translateForm);
 
 // Debug: Check what redirect URI the backend is actually using
 router.get('/debug/oauth', (req, res) => {
@@ -82,24 +86,95 @@ router.post('/list-sheets', async (req, res) => {
 
 router.post('/submit', async (req, res) => {
     try {
-        const { formId, answers, webhookUrl } = req.body;
+        const { formId, answers, googleSheetId, quizScore } = req.body;
 
-        if (supabase) {
-            const { error } = await supabase
+        if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+
+        // 1. Fetch form settings for verification and notification
+        const { data: form, error: formError } = await supabase
+            .from('forms')
+            .select(`
+                *,
+                user:user_id ( email )
+            `)
+            .eq('id', formId)
+            .single();
+
+        if (formError || !form) {
+            return res.status(404).json({ error: 'Form not found' });
+        }
+
+        // 2. Check Deadline & Response Limits (Backend Enforcement)
+        const theme = form.theme || {};
+        if (theme.deadline && new Date() > new Date(theme.deadline)) {
+            return res.status(403).json({ error: 'This form has reached its deadline.' });
+        }
+
+        if (theme.maxResponses) {
+            const { count } = await supabase
                 .from('responses')
-                .insert([{ form_id: formId, answers }]);
-
-            if (error) {
-                console.error("Error saving response to Supabase:", error);
+                .select('*', { count: 'exact', head: true })
+                .eq('form_id', formId);
+            
+            if (count >= parseInt(theme.maxResponses)) {
+                return res.status(403).json({ error: 'This form has reached its maximum response limit.' });
             }
         }
 
-        // If webhook logic applies, let it handle the response
-        if (webhookUrl) {
-            return await submitToSheets(req, res);
+        // 3. Save response to Supabase
+        const { error: insertError } = await supabase
+            .from('responses')
+            .insert([{ form_id: formId, answers, quiz_score: quizScore }]);
+
+        if (insertError) {
+            console.error("Error saving response to Supabase:", insertError);
+            return res.status(500).json({ error: 'Failed to save response to database' });
         }
 
-        return res.json({ success: true, message: 'Response saved locally.' });
+        // 4. Trigger Integrations (Async)
+        
+        // Email Notification (Admin)
+        if (theme.notifyEmail) {
+            const recipient = theme.notifyEmailAddress || form.user?.email;
+            if (recipient) {
+                sendNotificationEmail(recipient, form.title, answers).catch(console.error);
+            }
+        }
+
+        // Respondent Receipt
+        if (theme.sendReceipt) {
+            const respondentEmail = Object.entries(answers).find(([k, v]) => 
+                k.toLowerCase().includes('email') && v && /^\S+@\S+\.\S+$/.test(v)
+            )?.[1];
+            
+            if (respondentEmail) {
+                sendNotificationEmail(respondentEmail, form.title, answers, `Receipt: ${form.title}`).catch(console.error);
+            }
+        }
+
+        // Webhook
+        if (theme.webhookUrl) {
+            fetch(theme.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    form_id: formId,
+                    form_title: form.title,
+                    answers,
+                    timestamp: new Date().toISOString()
+                })
+            }).catch(err => console.error('Webhook trigger failed:', err));
+        }
+
+        // Google Sheets
+        if (googleSheetId) {
+            // Re-using existing sheets logic
+            req.body.webhookUrl = null; // Prevent recursion if sheets logic uses this
+            await submitToSheets(req, res);
+            return; // res.json already called in submitToSheets
+        }
+
+        return res.json({ success: true, message: 'Response saved.' });
     } catch (err) {
         console.error('Submit route error:', err);
         return res.status(500).json({ error: 'Failed to process submission' });
@@ -114,7 +189,7 @@ router.get('/stats', requireAuth, async (req, res) => {
         const { data: forms, error: formsError } = await supabase
             .from('forms')
             .select('id')
-            .eq('user_id', req.user.id);
+            .or(`user_id.eq.${req.user.id},shared_with.cs.["${req.user.email}"]`);
 
         if (formsError) throw formsError;
 
@@ -149,7 +224,7 @@ router.get('/forms', requireAuth, async (req, res) => {
         const { data, error } = await supabase
             .from('forms')
             .select('*')
-            .eq('user_id', req.user.id)
+            .or(`user_id.eq.${req.user.id},shared_with.cs.["${req.user.email}"]`)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -170,12 +245,12 @@ router.get('/forms', requireAuth, async (req, res) => {
 // Get all responses for all forms owned by the user
 router.get('/responses', requireAuth, async (req, res) => {
     try {
-        console.log('Fetching all responses for user:', req.user.id);
-        // First find forms owned by user
+        console.log('Fetching all responses for user:', req.user.id, req.user.email);
+        // First find forms owned by or shared with user
         const { data: forms, error: formsError } = await supabase
             .from('forms')
             .select('id')
-            .eq('user_id', req.user.id);
+            .or(`user_id.eq.${req.user.id},shared_with.cs.["${req.user.email}"]`);
 
         if (formsError) throw formsError;
 
@@ -209,16 +284,22 @@ router.get('/forms/:id/responses', requireAuth, async (req, res) => {
     try {
         if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
 
-        // Verify ownership
+        // Verify ownership or shared access
         const { data: form, error: formError } = await supabase
             .from('forms')
-            .select('id')
+            .select('id, user_id, shared_with')
             .eq('id', req.params.id)
-            .eq('user_id', req.user.id)
             .single();
 
         if (formError || !form) {
-            return res.status(403).json({ error: 'Unauthorized or form not found' });
+            return res.status(404).json({ error: 'Form not found' });
+        }
+
+        const isOwner = form.user_id === req.user.id;
+        const isSharedMember = Array.isArray(form.shared_with) && form.shared_with.includes(req.user.email);
+
+        if (!isOwner && !isSharedMember) {
+            return res.status(403).json({ error: 'Unauthorized to view responses for this form' });
         }
 
         const { data: responses, error } = await supabase
@@ -246,10 +327,11 @@ router.post('/forms', optionalAuth, async (req, res) => {
         const { data: existing } = await supabase.from('forms').select('*').eq('id', id).single();
 
         let isOwner = req.user && existing && existing.user_id === req.user.id;
+        let isSharedMember = req.user && existing && Array.isArray(existing.shared_with) && existing.shared_with.includes(req.user.email);
         let isCreating = !existing;
         let hasEditLink = existing && existing.sharing_id === edit_token && existing.sharing_level === 'edit';
 
-        if (!isCreating && !isOwner && !hasEditLink) {
+        if (!isCreating && !isOwner && !hasEditLink && !isSharedMember) {
             return res.status(403).json({ error: 'Not authorized to edit this form' });
         }
 
@@ -266,6 +348,10 @@ router.post('/forms', optionalAuth, async (req, res) => {
 
         if (req.body.custom_url !== undefined) {
             upsertData.custom_url = req.body.custom_url || null; // null if empty
+        }
+
+        if (req.body.shared_with !== undefined && (isCreating || isOwner)) {
+            upsertData.shared_with = req.body.shared_with || [];
         }
 
         // Only owner can change sharing settings

@@ -56,7 +56,7 @@ export default function AICreate() {
                         </div>
                         <h1 className="text-3xl font-bold text-gray-900">Generate with AI</h1>
                     </div>
-                    <p className="text-gray-500 mb-8 ml-14">Describe the form you want to create and let AI build it instantly.</p>
+                    <p className="text-gray-500 mb-8 ml-14">Describe the form you want to create and let AI build it instantly. Or <button onClick={() => navigate('/templates')} className="text-primary-600 font-bold hover:underline">browse templates</button></p>
 
                     <form onSubmit={handleGenerate}>
                         <div className="mb-6">

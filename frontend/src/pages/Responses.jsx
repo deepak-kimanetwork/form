@@ -71,11 +71,20 @@ export default function Responses() {
                                             {getFormTitle(resp.form_id || resp.formId)}
                                         </td>
                                         <td className="p-4 align-top">
+                                            {resp.quiz_score !== undefined && resp.quiz_score !== null && (
+                                                <div className="mb-3 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg inline-flex items-center gap-2 text-xs font-bold border border-primary-100">
+                                                    Score: {resp.quiz_score}
+                                                </div>
+                                            )}
                                             <div className="space-y-2">
                                                 {Object.entries(resp.answers || {}).map(([key, val]) => (
                                                     <div key={key} className="text-sm">
                                                         <span className="font-semibold text-gray-700">{key}: </span>
-                                                        <span className="text-gray-600">{Array.isArray(val) ? val.join(', ') : val}</span>
+                                                        <span className="text-gray-600">
+                                                            {typeof val === 'string' && val.startsWith('http') ? (
+                                                                <a href={val} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">View File</a>
+                                                            ) : Array.isArray(val) ? val.join(', ') : String(val)}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>

@@ -17,7 +17,7 @@ import { supabase } from '../utils/supabase';
 import { checkCustomUrl } from '../utils/storage';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no', 'nested-choice'];
+const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no', 'nested-choice', 'file-upload'];
 
 function SortableItem({ id, question, allQuestions, updateQuestion, removeQuestion }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -35,13 +35,41 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                 </div>
 
                 <div className="flex-1 space-y-4">
-                    <input
-                        type="text"
-                        value={question.label}
-                        onChange={(e) => updateQuestion(id, 'label', e.target.value)}
-                        placeholder="Question Text"
-                        className="w-full text-lg font-medium outline-none border-b border-transparent hover:border-gray-300 focus:border-primary-500 pb-1"
-                    />
+                    <div className="flex gap-2 items-center">
+                        <input
+                            type="text"
+                            value={question.label}
+                            onChange={(e) => updateQuestion(id, 'label', e.target.value)}
+                            placeholder="Question Text"
+                            className="w-full text-lg font-medium outline-none border-b border-transparent hover:border-gray-300 focus:border-primary-500 pb-1"
+                        />
+                        <div className="flex items-center gap-1">
+                            <label className="p-2 text-gray-400 hover:text-primary-600 cursor-pointer rounded-lg hover:bg-primary-50 transition-all" title="Add Image to Question">
+                                <ImageIcon className="w-5 h-5" />
+                                <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*" 
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) handleQuestionImageUpload(id, file);
+                                    }}
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    {question.imageUrl && (
+                        <div className="relative w-full max-w-sm group/img">
+                            <img src={question.imageUrl} className="rounded-xl border border-gray-100 shadow-sm max-h-48 object-contain bg-gray-50" alt="Question" />
+                            <button 
+                                onClick={() => updateQuestion(id, 'imageUrl', null)}
+                                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity shadow-lg"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-4 mb-3">
                         <select
@@ -96,6 +124,23 @@ function SortableItem({ id, question, allQuestions, updateQuestion, removeQuesti
                             </label>
                         )}
                     </div>
+
+                    {form.theme?.isQuizMode && (
+                        <div className="bg-primary-50 p-4 rounded-xl border border-primary-100 mb-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="w-4 h-4 text-primary-600" />
+                                <span className="text-xs font-bold text-primary-700 uppercase tracking-widest">Quiz Mode: Correct Answer</span>
+                            </div>
+                            <input 
+                                type="text"
+                                value={question.correctAnswer || ''}
+                                onChange={(e) => updateQuestion(id, 'correctAnswer', e.target.value)}
+                                placeholder="Exact correct answer (case-sensitive)"
+                                className="w-full text-sm bg-white border-none rounded-lg p-2 focus:ring-2 focus:ring-primary-500 outline-none"
+                            />
+                            <p className="text-[10px] text-primary-500 mt-1 font-medium italic">Respondents get 1 point for matching this exactly.</p>
+                        </div>
+                    )}
 
                     {(question.type === 'select' || question.type === 'multiple-choice' || question.type === 'dropdown') && (
                         <div className="pt-2">
@@ -727,6 +772,28 @@ export default function FormBuilder() {
         }
     };
 
+    const handleQuestionImageUpload = async (questionId, file) => {
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `qimg_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `${form.id}/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('logos')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('logos').getPublicUrl(filePath);
+            updateQuestion(questionId, 'imageUrl', data.publicUrl);
+        } catch (error) {
+            alert('Error uploading question image: ' + error.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -801,6 +868,12 @@ export default function FormBuilder() {
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'analytics' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 <BarChart3 className="w-4 h-4 inline-block mr-2" /> Analytics
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('settings')}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <Settings className="w-4 h-4 inline-block mr-2" /> Settings
                             </button>
                             <button
                                 onClick={() => setActiveTab('integrations')}
@@ -1349,6 +1422,137 @@ export default function FormBuilder() {
                     <AnalyticsView form={form} responses={responses} />
                 )}
 
+                {activeTab === 'settings' && (
+                    <div className="max-w-4xl mx-auto py-12 px-6">
+                        <div className="mb-10 text-left">
+                            <h2 className="text-4xl font-black text-gray-900 mb-2">Form Settings</h2>
+                            <p className="text-gray-500 text-lg">Control access, behavior, and automation for your form.</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Quiz Mode */}
+                            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 flex items-center justify-between group hover:border-primary-200 transition-all">
+                                <div className="text-left">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Sparkles className="w-6 h-6 text-primary-600" />
+                                        <h3 className="text-xl font-black text-gray-900">Quiz Mode</h3>
+                                    </div>
+                                    <p className="text-gray-500">Enable scoring for your form. Define correct answers for each question.</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={form.theme?.isQuizMode || false} onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, isQuizMode: e.target.checked }}))} className="sr-only peer" />
+                                    <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-primary-600"></div>
+                                </label>
+                            </div>
+
+                            {/* Password Protection */}
+                            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 hover:border-primary-200 transition-all text-left">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Settings className="w-6 h-6 text-gray-400" />
+                                    <h3 className="text-xl font-black text-gray-900">Access Protection</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className="text-sm font-bold text-gray-700 block ml-1 uppercase tracking-wider">Form Password</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Leave empty for no password"
+                                            value={form.theme?.password || ''}
+                                            onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, password: e.target.value }}))}
+                                            className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="text-sm font-bold text-gray-700 block ml-1 uppercase tracking-wider">Custom Edit Token</label>
+                                        <input 
+                                            type="text" 
+                                            value={form.edit_token || ''}
+                                            readOnly
+                                            className="w-full p-4 bg-gray-100 border-2 border-transparent rounded-2xl outline-none text-gray-400 font-mono text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Limits & Deadline */}
+                            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 hover:border-primary-200 transition-all text-left">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Clock className="w-6 h-6 text-orange-500" />
+                                    <h3 className="text-xl font-black text-gray-900">Limits & Deadlines</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className="text-sm font-bold text-gray-700 block ml-1 uppercase tracking-wider">Max Responses</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="e.g. 100"
+                                            value={form.theme?.maxResponses || ''}
+                                            onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, maxResponses: e.target.value }}))}
+                                            className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="text-sm font-bold text-gray-700 block ml-1 uppercase tracking-wider">Close on Date</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={form.theme?.deadline || ''}
+                                            onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, deadline: e.target.value }}))}
+                                            className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Notifications & Automation */}
+                            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 hover:border-primary-200 transition-all text-left">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Mail className="w-6 h-6 text-blue-500" />
+                                    <h3 className="text-xl font-black text-gray-900">Email & Automation</h3>
+                                </div>
+                                
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-gray-900">Notify Admin</p>
+                                            <p className="text-sm text-gray-500">Get an email when someone completes your form.</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={form.theme?.notifyEmail || false} onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, notifyEmail: e.target.checked }}))} className="sr-only peer" />
+                                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-primary-600"></div>
+                                        </label>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-gray-900">Send Respondent Receipt</p>
+                                            <p className="text-sm text-gray-500">Send a copy of responses to the user (requires an email question).</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={form.theme?.sendReceipt || false} onChange={(e) => setForm(f => ({ ...f, theme: { ...f.theme, sendReceipt: e.target.checked }}))} className="sr-only peer" />
+                                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-primary-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Team Sharing */}
+                            <div className="bg-white p-8 rounded-3xl border-2 border-gray-100 hover:border-primary-200 transition-all text-left">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Users className="w-6 h-6 text-purple-500" />
+                                    <h3 className="text-xl font-black text-gray-900">Team Sharing</h3>
+                                </div>
+                                <p className="text-gray-500 mb-4">Add team members to this form (comma separated emails).</p>
+                                <input 
+                                    type="text" 
+                                    placeholder="colleague@example.com, boss@example.com"
+                                    value={form.shared_with ? form.shared_with.join(', ') : ''}
+                                    onChange={(e) => setForm(f => ({ ...f, shared_with: e.target.value.split(',').map(em => em.trim()).filter(Boolean) }))}
+                                    className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-primary-500 focus:bg-white rounded-2xl outline-none transition-all"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'integrations' && (
                     <div className="max-w-4xl mx-auto py-12 px-6">
                         <div className="mb-10 text-left">
