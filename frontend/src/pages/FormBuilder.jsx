@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const questionTypes = ['text', 'email', 'number', 'select', 'dropdown', 'textarea', 'multiple-choice', 'rating', 'opinion-scale', 'welcome-screen', 'yes-no', 'nested-choice', 'file-upload'];
 
-function SortableItem({ id, question, allQuestions, updateQuestion, removeQuestion }) {
+function SortableItem({ id, question, allQuestions, updateQuestion, removeQuestion, form, duplicateQuestion, handleQuestionImageUpload }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
 
     const style = {
@@ -472,6 +472,7 @@ export default function FormBuilder() {
     const [availableSheets, setAvailableSheets] = useState([]);
     const [loadingSheets, setLoadingSheets] = useState(false);
     const [showSheetPicker, setShowSheetPicker] = useState(false);
+    const [isNewForm, setIsNewForm] = useState(!location.state?.formId && !searchParams.get('share'));
 
     useEffect(() => {
         const handleMessage = (event) => {
@@ -541,14 +542,14 @@ export default function FormBuilder() {
     );
 
     useEffect(() => {
-        if (form.id) {
+        if (form.id && !isNewForm) {
             const fetchResponses = async () => {
                 const res = await getResponses(form.id);
                 setResponses(res || []);
             };
             fetchResponses();
         }
-    }, [form.id, activeTab]);
+    }, [form.id, activeTab, isNewForm]);
 
     useEffect(() => {
         const shareToken = searchParams.get('share');
@@ -809,6 +810,7 @@ export default function FormBuilder() {
             updatedForm.sharing_level = shareLevel;
 
             await saveForm(updatedForm, form.edit_token);
+            setIsNewForm(false);
             alert('Form saved successfully!');
             if (!searchParams.get('share')) {
                 navigate('/admin');
@@ -1186,6 +1188,9 @@ export default function FormBuilder() {
                                                     allQuestions={form.questions}
                                                     updateQuestion={updateQuestion}
                                                     removeQuestion={removeQuestion}
+                                                    form={form}
+                                                    duplicateQuestion={duplicateQuestion}
+                                                    handleQuestionImageUpload={handleQuestionImageUpload}
                                                 />
                                             ))}
                                         </SortableContext>
